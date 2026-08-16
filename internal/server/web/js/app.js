@@ -149,6 +149,7 @@ function fillForm(opts) {
       el.value = value;
     }
   }
+  switchTab("pack");
 }
 
 async function refreshEnv() {
@@ -429,24 +430,48 @@ iconPreview.addEventListener("drop", (e) => {
 form.addEventListener("submit", startBuild);
 
 // —— Cloud (GitHub macOS) ——
-const cloudJobList = document.getElementById("cloud-job-list");
 const ghStatus = document.getElementById("gh-status");
+const ghLoginLabel = document.getElementById("gh-login-label");
+const ghDeviceHint = document.getElementById("gh-device-hint");
+const ghDeviceCode = document.getElementById("gh-device-code");
+const btnGhLogin = document.getElementById("btn-gh-login");
+const btnGhLogout = document.getElementById("btn-gh-logout");
 let cloudPollTimer = null;
+let oauthPollTimer = null;
+
+function applyGitHubSettingsView(s) {
+  document.getElementById("gh-owner").value = s.owner || "DDZH-DEV";
+  document.getElementById("gh-repo").value = s.repo || "pake-gui";
+  document.getElementById("gh-workflow").value = s.workflow || "build-macos.yml";
+  document.getElementById("gh-ref").value = s.ref || "";
+  document.getElementById("gh-client-id").value = s.clientId || "";
+  document.getElementById("gh-token").value = "";
+  document.getElementById("gh-token").placeholder = s.tokenMasked
+    ? `已保存 ${s.tokenMasked}（留空保留）`
+    : "可选备用 PAT";
+  if (s.configured && s.login) {
+    ghLoginLabel.textContent = "已登录 @" + s.login;
+    btnGhLogout.hidden = false;
+    btnGhLogin.textContent = "重新授权";
+    ghStatus.textContent = "已授权";
+  } else if (s.configured) {
+    ghLoginLabel.textContent = "已配置 Token（未显示用户名）";
+    btnGhLogout.hidden = false;
+    btnGhLogin.textContent = "使用 GitHub 授权";
+    ghStatus.textContent = "已配置";
+  } else {
+    ghLoginLabel.textContent = "未登录";
+    btnGhLogout.hidden = true;
+    btnGhLogin.textContent = "使用 GitHub 授权";
+    ghStatus.textContent = "未配置";
+  }
+}
 
 async function loadGitHubSettings() {
   try {
     const res = await api("/api/cloud/github/settings");
     const data = await res.json();
-    const s = data.settings || {};
-    document.getElementById("gh-owner").value = s.owner || "";
-    document.getElementById("gh-repo").value = s.repo || "";
-    document.getElementById("gh-workflow").value = s.workflow || "build-macos.yml";
-    document.getElementById("gh-ref").value = s.ref || "";
-    document.getElementById("gh-token").value = "";
-    document.getElementById("gh-token").placeholder = s.tokenMasked
-      ? `已保存 ${s.tokenMasked}（留空保留）`
-      : "ghp_… 需要 repo + workflow";
-    ghStatus.textContent = s.configured ? "已配置" : "未配置";
+    applyGitHubSettingsView(data.settings || {});
   } catch (err) {
     ghStatus.textContent = "加载失败：" + err.message;
   }
@@ -454,9 +479,10 @@ async function loadGitHubSettings() {
 
 async function saveGitHubSettings() {
   const body = {
-    owner: document.getElementById("gh-owner").value.trim(),
-    repo: document.getElementById("gh-repo").value.trim(),
+    owner: document.getElementById("gh-owner").value.trim() || "DDZH-DEV",
+    repo: document.getElementById("gh-repo").value.trim() || "pake-gui",
     token: document.getElementById("gh-token").value.trim(),
+    clientId: document.getElementById("gh-client-id").value.trim(),
     workflow: document.getElementById("gh-workflow").value.trim() || "build-macos.yml",
     ref: document.getElementById("gh-ref").value.trim(),
   };
@@ -474,7 +500,7 @@ async function saveGitHubSettings() {
   ghStatus.textContent = "已保存";
   appendLog("GitHub 设置已保存");
   document.getElementById("gh-token").value = "";
-  loadGitHubSettings();
+  applyGitHubSettingsView(data.settings || {});
 }
 
 async function testGitHubSettings() {
@@ -490,6 +516,96 @@ async function testGitHubSettings() {
   appendLog("GitHub 连接成功：" + (data.owner || "") + "/" + (data.repo || ""));
 }
 
+function stopOAuthPoll() {
+  if (oauthPollTimer) {
+    clearInterval(oauthPollTimer);
+    oauthPollTimer = null;
+  }
+}
+
+async function pollOAuthStatus() {
+  const res = await api("/api/cloud/github/oauth/status");
+  const data = await res.json();
+  const session = data.session || {};
+  if (session.pending && session.userCode) {
+    ghDeviceCode.hidden = false;
+    ghDeviceCode.textContent = session.userCode;
+    ghDeviceHint.textContent = "请在浏览器中确认设备码，等待授权完成…";
+  }
+  if (session.done) {
+    stopOAuthPoll();
+    ghDeviceCode.hidden = true;
+    if (session.ok) {
+      ghDeviceHint.textContent = "授权成功";
+      appendLog("GitHub 授权成功" + (session.login ? "：@" + session.login : ""));
+      applyGitHubSettingsView(data.settings || {});
+    } else {
+      ghDeviceHint.textContent = session.error || "授权失败";
+      appendLog("GitHub 授权失败：" + (session.error || ""));
+      loadGitHubSettings();
+    }
+  }
+}
+
+async function startGitHubOAuth() {
+  stopOAuthPoll();
+  const body = {
+    clientId: document.getElementById("gh-client-id").value.trim(),
+    owner: document.getElementById("gh-owner").value.trim() || "DDZH-DEV",
+    repo: document.getElementById("gh-repo").value.trim() || "pake-gui",
+  };
+  // Persist client id / repo first
+  await api("/api/cloud/github/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...body,
+      workflow: document.getElementById("gh-workflow").value.trim() || "build-macos.yml",
+      ref: document.getElementById("gh-ref").value.trim(),
+      token: "",
+      clientId: body.clientId,
+    }),
+  });
+
+  ghStatus.textContent = "正在发起授权…";
+  ghDeviceHint.textContent = "正在打开浏览器…";
+  const res = await api("/api/cloud/github/oauth/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    ghStatus.textContent = data.error || "无法启动授权";
+    ghDeviceHint.textContent = data.error || "请检查 Client ID，并确认 OAuth App 已启用 Device Flow";
+    appendLog("GitHub 授权启动失败：" + (data.error || ""));
+    return;
+  }
+  const device = data.device || {};
+  ghDeviceCode.hidden = false;
+  ghDeviceCode.textContent = device.userCode || "";
+  ghDeviceHint.textContent = "浏览器已打开；若未打开，请访问 " + (device.verificationUri || "https://github.com/login/device");
+  ghStatus.textContent = "等待授权确认…";
+  appendLog("GitHub 设备码：" + (device.userCode || "") + " → " + (device.verificationUri || ""));
+  oauthPollTimer = setInterval(() => {
+    pollOAuthStatus().catch(() => {});
+  }, 2000);
+}
+
+async function logoutGitHub() {
+  stopOAuthPoll();
+  const res = await api("/api/cloud/github/oauth/logout", { method: "POST" });
+  const data = await res.json();
+  if (!data.ok) {
+    appendLog("退出失败：" + (data.error || ""));
+    return;
+  }
+  ghDeviceCode.hidden = true;
+  ghDeviceHint.textContent = "已退出登录";
+  appendLog("已退出 GitHub 登录");
+  applyGitHubSettingsView(data.settings || {});
+}
+
 function stateBadge(state) {
   if (state === "success") return { cls: "ok", text: "成功" };
   if (state === "failed") return { cls: "bad", text: "失败" };
@@ -500,40 +616,50 @@ function stateBadge(state) {
 }
 
 async function refreshCloudJobs() {
-  if (!cloudJobList) return;
+  const lists = [
+    document.getElementById("cloud-job-list"),
+    document.getElementById("cloud-job-list-2"),
+  ].filter(Boolean);
+  if (!lists.length) return;
   try {
     const res = await api("/api/cloud/jobs");
     const data = await res.json();
     const jobs = data.jobs || [];
-    cloudJobList.innerHTML = "";
-    if (!jobs.length) {
-      cloudJobList.innerHTML = `<li><span class="meta">暂无云端任务</span></li>`;
-      return;
-    }
     let needPoll = false;
-    for (const job of jobs.slice(0, 12)) {
-      const st = job.status?.state || "";
-      if (st === "running" || st === "queued") needPoll = true;
-      const li = document.createElement("li");
-      const left = document.createElement("div");
-      const name = job.request?.name || job.id;
-      const plat = job.request?.platform || "macos";
-      left.innerHTML = `<button type="button" data-open="${job.id}">${name}</button>
-        <div class="meta">${plat} · ${job.id}<br/>${job.status?.message || ""}</div>`;
-      const badge = document.createElement("span");
-      const b = stateBadge(st);
-      badge.className = `badge ${b.cls}`;
-      badge.textContent = b.text;
-      li.append(left, badge);
-      left.querySelector("button").addEventListener("click", async () => {
-        await api(`/api/cloud/jobs/${encodeURIComponent(job.id)}?action=open`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "open" }),
+
+    const renderInto = (el) => {
+      el.innerHTML = "";
+      if (!jobs.length) {
+        el.innerHTML = `<li><span class="meta">暂无云端任务</span></li>`;
+        return;
+      }
+      for (const job of jobs.slice(0, 12)) {
+        const st = job.status?.state || "";
+        if (st === "running" || st === "queued") needPoll = true;
+        const li = document.createElement("li");
+        const left = document.createElement("div");
+        const name = job.request?.name || job.id;
+        const plat = job.request?.platform || "macos";
+        left.innerHTML = `<button type="button">${name}</button>
+          <div class="meta">${plat} · ${job.id}<br/>${job.status?.message || ""}</div>`;
+        const badge = document.createElement("span");
+        const b = stateBadge(st);
+        badge.className = `badge ${b.cls}`;
+        badge.textContent = b.text;
+        li.append(left, badge);
+        left.querySelector("button").addEventListener("click", async () => {
+          await api(`/api/cloud/jobs/${encodeURIComponent(job.id)}?action=open`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "open" }),
+          });
         });
-      });
-      cloudJobList.appendChild(li);
-    }
+        el.appendChild(li);
+      }
+    };
+
+    for (const el of lists) renderInto(el);
+
     if (needPoll && !cloudPollTimer) {
       cloudPollTimer = setInterval(refreshCloudJobs, 8000);
     }
@@ -542,7 +668,9 @@ async function refreshCloudJobs() {
       cloudPollTimer = null;
     }
   } catch {
-    cloudJobList.innerHTML = `<li><span class="meta">无法加载云端任务</span></li>`;
+    for (const el of lists) {
+      el.innerHTML = `<li><span class="meta">无法加载云端任务</span></li>`;
+    }
   }
 }
 
@@ -588,17 +716,49 @@ async function submitCloudMacOS() {
   const data = await res.json();
   if (!data.ok) {
     appendLog("提交失败：" + (data.error || res.status));
-    document.getElementById("cloud-settings")?.setAttribute("open", "");
+    switchTab("cloud");
     return;
   }
   appendLog("已创建任务：" + data.job?.id + "（后台轮询 GitHub Actions，产物在 builds/macos）");
   refreshCloudJobs();
+  switchTab("cloud");
 }
+
+function switchTab(name) {
+  const buttons = document.querySelectorAll(".tab-btn");
+  const panels = {
+    pack: document.getElementById("tab-pack"),
+    cloud: document.getElementById("tab-cloud"),
+    jobs: document.getElementById("tab-jobs"),
+    env: document.getElementById("tab-env"),
+  };
+  for (const btn of buttons) {
+    const on = btn.dataset.tab === name;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+  }
+  for (const [key, panel] of Object.entries(panels)) {
+    if (!panel) continue;
+    const on = key === name;
+    panel.classList.toggle("active", on);
+    panel.hidden = !on;
+  }
+  if (name === "jobs" || name === "cloud") refreshCloudJobs();
+  if (name === "env") refreshEnv();
+  if (name === "jobs") refreshHistory();
+}
+
+document.querySelectorAll(".tab-btn").forEach((btn) => {
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+});
 
 document.getElementById("btn-gh-save")?.addEventListener("click", saveGitHubSettings);
 document.getElementById("btn-gh-test")?.addEventListener("click", testGitHubSettings);
+document.getElementById("btn-gh-login")?.addEventListener("click", startGitHubOAuth);
+document.getElementById("btn-gh-logout")?.addEventListener("click", logoutGitHub);
 document.getElementById("btn-cloud-macos")?.addEventListener("click", submitCloudMacOS);
 document.getElementById("btn-refresh-cloud")?.addEventListener("click", refreshCloudJobs);
+document.getElementById("btn-refresh-cloud-2")?.addEventListener("click", refreshCloudJobs);
 
 refreshEnv();
 refreshHistory();

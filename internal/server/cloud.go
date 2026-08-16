@@ -45,6 +45,7 @@ func (s *Server) handleCloudGitHubSettings(w http.ResponseWriter, r *http.Reques
 			Owner    string `json:"owner"`
 			Repo     string `json:"repo"`
 			Token    string `json:"token"`
+			ClientID string `json:"clientId"`
 			Workflow string `json:"workflow"`
 			Ref      string `json:"ref"`
 		}
@@ -55,16 +56,23 @@ func (s *Server) handleCloudGitHubSettings(w http.ResponseWriter, r *http.Reques
 		existing, _ := github.LoadSettings(s.cfg.DataDir)
 		token := strings.TrimSpace(body.Token)
 		if token == "" {
-			token = existing.Token // allow update without re-entering token
+			token = existing.Token
+		}
+		clientID := strings.TrimSpace(body.ClientID)
+		if clientID == "" {
+			clientID = existing.ClientID
 		}
 		st := github.Settings{
 			Owner:    body.Owner,
 			Repo:     body.Repo,
 			Token:    token,
+			Login:    existing.Login,
+			ClientID: clientID,
 			Workflow: body.Workflow,
 			Ref:      body.Ref,
 		}
-		if err := github.SaveSettings(s.cfg.DataDir, st); err != nil {
+		// Saving settings (owner/repo/clientId) should not require token.
+		if err := github.SaveSettingsAllowEmptyToken(s.cfg.DataDir, st); err != nil {
 			writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
 			return
 		}
@@ -73,6 +81,75 @@ func (s *Server) handleCloudGitHubSettings(w http.ResponseWriter, r *http.Reques
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *Server) handleCloudGitHubOAuthStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		ClientID string `json:"clientId"`
+		Owner    string `json:"owner"`
+		Repo     string `json:"repo"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+
+	st, _ := github.LoadSettings(s.cfg.DataDir)
+	clientID := strings.TrimSpace(body.ClientID)
+	if clientID == "" {
+		clientID = st.ClientID
+	}
+	if clientID != "" {
+		st.ClientID = clientID
+	}
+	if o := strings.TrimSpace(body.Owner); o != "" {
+		st.Owner = o
+	}
+	if repo := strings.TrimSpace(body.Repo); repo != "" {
+		st.Repo = repo
+	}
+	_ = github.SaveSettingsAllowEmptyToken(s.cfg.DataDir, st)
+
+	start, err := github.StartDeviceFlow(r.Context(), s.cfg.DataDir, clientID)
+	if err != nil {
+		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	openURL := start.VerificationURIComplete
+	if openURL == "" {
+		openURL = start.VerificationURI
+	}
+	_ = openPath(openURL)
+	applog.Info("github device flow started user_code=%s", start.UserCode)
+	writeJSON(w, map[string]any{"ok": true, "device": start})
+}
+
+func (s *Server) handleCloudGitHubOAuthStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	snap := github.CurrentAuthSession().Snapshot()
+	st, _ := github.LoadSettings(s.cfg.DataDir)
+	writeJSON(w, map[string]any{
+		"ok":       true,
+		"session":  snap,
+		"settings": st.PublicView(),
+	})
+}
+
+func (s *Server) handleCloudGitHubOAuthLogout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := github.Logout(s.cfg.DataDir); err != nil {
+		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	st, _ := github.LoadSettings(s.cfg.DataDir)
+	writeJSON(w, map[string]any{"ok": true, "settings": st.PublicView()})
 }
 
 func (s *Server) handleCloudGitHubTest(w http.ResponseWriter, r *http.Request) {

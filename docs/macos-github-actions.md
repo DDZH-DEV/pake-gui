@@ -21,10 +21,20 @@ git push -u origin master
 ## 在 Pake GUI 里提交（推荐）
 
 1. 推送本仓库到 GitHub（需包含 `.github/workflows/build-macos.yml`）
-2. 创建 PAT（权限：`repo` + `workflow`）
-3. 打开 Pake GUI → 展开「云端打包 · GitHub 设置」→ 填写 Owner/Repo/Token → 保存 → 测试连接
-4. 填好网址、应用名、图标后点「提交 macOS 云端」
-5. 右侧「云端任务」查看进度；成功后产物在 `builds/macos/`
+2. 创建 [GitHub OAuth App](https://github.com/settings/developers)：
+   - Homepage：`https://github.com/DDZH-DEV/pake-gui`
+   - Callback：`http://127.0.0.1/`（占位即可）
+   - **启用 Device Flow**
+   - 复制 **Client ID**（不要把 Client Secret 放进仓库）
+3. 打开 Pake GUI →「云端打包 · GitHub 设置」
+   - 粘贴 Client ID → **使用 GitHub 授权** → 浏览器确认
+   - Owner/Repo 默认 `DDZH-DEV` / `pake-gui`
+4. 点「测试连接」确认权限
+5. 填好网址、应用名、图标后点「提交 macOS 云端」
+6. 右侧「云端任务」看进度；产物在 `builds/macos/`
+
+也可把 Client ID 写入 `configs/github-oauth.json` 的 `clientId` 字段。  
+高级选项仍支持手动粘贴 PAT。
 
 本地图标会上传到仓库 `ci-assets/macos/{jobId}/`，Actions checkout 后直接使用该路径（私有仓库也可用）。
 

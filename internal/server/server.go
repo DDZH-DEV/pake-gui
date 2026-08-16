@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"pake-gui/internal/applog"
@@ -70,6 +71,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/icon-file", s.handleIconFile)
 	s.mux.HandleFunc("/api/cloud/github/settings", s.handleCloudGitHubSettings)
 	s.mux.HandleFunc("/api/cloud/github/test", s.handleCloudGitHubTest)
+	s.mux.HandleFunc("/api/cloud/github/oauth/start", s.handleCloudGitHubOAuthStart)
+	s.mux.HandleFunc("/api/cloud/github/oauth/status", s.handleCloudGitHubOAuthStatus)
+	s.mux.HandleFunc("/api/cloud/github/oauth/logout", s.handleCloudGitHubOAuthLogout)
 	s.mux.HandleFunc("/api/cloud/jobs", s.handleCloudJobs)
 	s.mux.HandleFunc("/api/cloud/jobs/", s.handleCloudJobByID)
 	s.mux.Handle("/", s.spa())
@@ -461,8 +465,13 @@ func quote(s string) string {
 func openPath(path string) error {
 	switch runtime.GOOS {
 	case "windows":
-		// Works for both files and directories.
-		return exec.Command("cmd", "/c", "start", "", path).Start()
+		// Hide the intermediate cmd.exe console; "start" still opens Explorer/browser.
+		cmd := exec.Command("cmd", "/c", "start", "", path)
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			HideWindow:    true,
+			CreationFlags: 0x08000000, // CREATE_NO_WINDOW
+		}
+		return cmd.Start()
 	case "darwin":
 		return exec.Command("open", path).Start()
 	default:

@@ -8,10 +8,18 @@ import (
 	"syscall"
 )
 
+const (
+	createNewProcessGroup = 0x00000200
+	createNoWindow        = 0x08000000
+)
+
 func prepareCmd(cmd *exec.Cmd) {
+	if cmd == nil {
+		return
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		CreationFlags: 0x00000200, // CREATE_NEW_PROCESS_GROUP
 		HideWindow:    true,
+		CreationFlags: createNewProcessGroup | createNoWindow,
 	}
 }
 
@@ -20,6 +28,6 @@ func killProcessTree(pid int) {
 		return
 	}
 	c := exec.Command("taskkill", "/T", "/F", "/PID", strconv.Itoa(pid))
-	c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	prepareCmd(c)
 	_ = c.Run()
 }

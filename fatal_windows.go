@@ -11,7 +11,12 @@ import (
 )
 
 func openBrowser(url string) {
-	_ = exec.Command("cmd", "/c", "start", "", url).Start()
+	cmd := exec.Command("cmd", "/c", "start", "", url)
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: 0x08000000, // CREATE_NO_WINDOW
+	}
+	_ = cmd.Start()
 }
 
 func fatalf(format string, args ...any) {

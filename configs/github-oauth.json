@@ -1,0 +1,6 @@
+{
+  "clientId": "",
+  "defaultOwner": "DDZH-DEV",
+  "defaultRepo": "pake-gui",
+  "notes": "Create an OAuth App at https://github.com/settings/developers , enable Device Flow, paste clientId here or in the GUI. Client ID is public; do not put Client Secret in this repo."
+}

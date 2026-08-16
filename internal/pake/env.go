@@ -35,9 +35,9 @@ func CheckEnv() EnvStatus {
 	pake := ToolStatus{Name: "pake-cli"}
 	if _, _, err := ResolveRunner(); err == nil {
 		pake.OK = true
-		if out, e := exec.Command("pake", "--version").CombinedOutput(); e == nil {
+		if out, e := runHidden("pake", "--version"); e == nil {
 			pake.Version = strings.TrimSpace(string(out))
-		} else if out, e := exec.Command("npx", "--yes", "pake-cli", "--version").CombinedOutput(); e == nil {
+		} else if out, e := runHidden("npx", "--yes", "pake-cli", "--version"); e == nil {
 			pake.Version = strings.TrimSpace(string(out))
 			pake.Detail = "via npx"
 		} else {
@@ -60,7 +60,7 @@ func checkCmd(name string, args ...string) ToolStatus {
 		st.Detail = "not found"
 		return st
 	}
-	out, err := exec.Command(name, args...).CombinedOutput()
+	out, err := runHidden(name, args...)
 	ver := strings.TrimSpace(string(out))
 	if err != nil && ver == "" {
 		st.Detail = path
@@ -73,8 +73,7 @@ func checkCmd(name string, args ...string) ToolStatus {
 }
 
 func InstallPakeCLI() (string, error) {
-	cmd := exec.Command("npm", "install", "-g", "pake-cli")
-	out, err := cmd.CombinedOutput()
+	out, err := runHidden("npm", "install", "-g", "pake-cli")
 	text := strings.TrimSpace(string(out))
 	if err != nil {
 		if text == "" {
@@ -83,4 +82,10 @@ func InstallPakeCLI() (string, error) {
 		return text, err
 	}
 	return text, nil
+}
+
+func runHidden(name string, args ...string) ([]byte, error) {
+	cmd := exec.Command(name, args...)
+	prepareCmd(cmd)
+	return cmd.CombinedOutput()
 }

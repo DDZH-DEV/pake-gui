@@ -2,6 +2,12 @@
 *.test
 builds/*
 !builds/.gitkeep
+!builds/windows/
+!builds/windows/.gitkeep
+!builds/macos/
+!builds/macos/.gitkeep
+!builds/android/
+!builds/android/.gitkeep
 data/
 .DS_Store
 PakeGUI.exe

@@ -28,7 +28,11 @@ func main() {
 	buildsDir := filepath.Join(root, "builds")
 	dataDir := filepath.Join(root, "data")
 	_ = os.MkdirAll(buildsDir, 0o755)
+	_ = os.MkdirAll(filepath.Join(buildsDir, "windows"), 0o755)
+	_ = os.MkdirAll(filepath.Join(buildsDir, "macos"), 0o755)
+	_ = os.MkdirAll(filepath.Join(buildsDir, "android"), 0o755)
 	_ = os.MkdirAll(dataDir, 0o755)
+	_ = os.MkdirAll(filepath.Join(dataDir, "cloud-jobs"), 0o755)
 
 	if _, err := applog.Init(dataDir); err != nil {
 		fatalf("无法初始化日志: %v", err)

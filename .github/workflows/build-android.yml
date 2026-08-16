@@ -1,0 +1,25 @@
+# Build Android app via GitHub Actions (reserved for T03).
+# Keep disabled until Android pipeline is chosen.
+name: Build Android App (Reserved)
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Website URL (placeholder)"
+        required: true
+        type: string
+      name:
+        description: "App name (placeholder)"
+        required: true
+        type: string
+
+jobs:
+  reserved:
+    name: placeholder
+    runs-on: ubuntu-latest
+    steps:
+      - name: Not implemented
+        run: |
+          echo "T03 Android cloud build is reserved. See tasks/T03-android-cloud/"
+          exit 1

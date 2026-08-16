@@ -428,5 +428,179 @@ iconPreview.addEventListener("drop", (e) => {
 
 form.addEventListener("submit", startBuild);
 
+// —— Cloud (GitHub macOS) ——
+const cloudJobList = document.getElementById("cloud-job-list");
+const ghStatus = document.getElementById("gh-status");
+let cloudPollTimer = null;
+
+async function loadGitHubSettings() {
+  try {
+    const res = await api("/api/cloud/github/settings");
+    const data = await res.json();
+    const s = data.settings || {};
+    document.getElementById("gh-owner").value = s.owner || "";
+    document.getElementById("gh-repo").value = s.repo || "";
+    document.getElementById("gh-workflow").value = s.workflow || "build-macos.yml";
+    document.getElementById("gh-ref").value = s.ref || "";
+    document.getElementById("gh-token").value = "";
+    document.getElementById("gh-token").placeholder = s.tokenMasked
+      ? `已保存 ${s.tokenMasked}（留空保留）`
+      : "ghp_… 需要 repo + workflow";
+    ghStatus.textContent = s.configured ? "已配置" : "未配置";
+  } catch (err) {
+    ghStatus.textContent = "加载失败：" + err.message;
+  }
+}
+
+async function saveGitHubSettings() {
+  const body = {
+    owner: document.getElementById("gh-owner").value.trim(),
+    repo: document.getElementById("gh-repo").value.trim(),
+    token: document.getElementById("gh-token").value.trim(),
+    workflow: document.getElementById("gh-workflow").value.trim() || "build-macos.yml",
+    ref: document.getElementById("gh-ref").value.trim(),
+  };
+  const res = await api("/api/cloud/github/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    ghStatus.textContent = data.error || "保存失败";
+    appendLog("GitHub 设置失败：" + (data.error || ""));
+    return;
+  }
+  ghStatus.textContent = "已保存";
+  appendLog("GitHub 设置已保存");
+  document.getElementById("gh-token").value = "";
+  loadGitHubSettings();
+}
+
+async function testGitHubSettings() {
+  ghStatus.textContent = "测试中…";
+  const res = await api("/api/cloud/github/test", { method: "POST" });
+  const data = await res.json();
+  if (!data.ok) {
+    ghStatus.textContent = data.error || "连接失败";
+    appendLog("GitHub 测试失败：" + (data.error || ""));
+    return;
+  }
+  ghStatus.textContent = `连接成功 · 默认分支 ${data.defaultBranch || "?"}`;
+  appendLog("GitHub 连接成功：" + (data.owner || "") + "/" + (data.repo || ""));
+}
+
+function stateBadge(state) {
+  if (state === "success") return { cls: "ok", text: "成功" };
+  if (state === "failed") return { cls: "bad", text: "失败" };
+  if (state === "canceled") return { cls: "bad", text: "取消" };
+  if (state === "running") return { cls: "ok", text: "进行中" };
+  if (state === "queued") return { cls: "ok", text: "排队" };
+  return { cls: "bad", text: state || "?" };
+}
+
+async function refreshCloudJobs() {
+  if (!cloudJobList) return;
+  try {
+    const res = await api("/api/cloud/jobs");
+    const data = await res.json();
+    const jobs = data.jobs || [];
+    cloudJobList.innerHTML = "";
+    if (!jobs.length) {
+      cloudJobList.innerHTML = `<li><span class="meta">暂无云端任务</span></li>`;
+      return;
+    }
+    let needPoll = false;
+    for (const job of jobs.slice(0, 12)) {
+      const st = job.status?.state || "";
+      if (st === "running" || st === "queued") needPoll = true;
+      const li = document.createElement("li");
+      const left = document.createElement("div");
+      const name = job.request?.name || job.id;
+      const plat = job.request?.platform || "macos";
+      left.innerHTML = `<button type="button" data-open="${job.id}">${name}</button>
+        <div class="meta">${plat} · ${job.id}<br/>${job.status?.message || ""}</div>`;
+      const badge = document.createElement("span");
+      const b = stateBadge(st);
+      badge.className = `badge ${b.cls}`;
+      badge.textContent = b.text;
+      li.append(left, badge);
+      left.querySelector("button").addEventListener("click", async () => {
+        await api(`/api/cloud/jobs/${encodeURIComponent(job.id)}?action=open`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "open" }),
+        });
+      });
+      cloudJobList.appendChild(li);
+    }
+    if (needPoll && !cloudPollTimer) {
+      cloudPollTimer = setInterval(refreshCloudJobs, 8000);
+    }
+    if (!needPoll && cloudPollTimer) {
+      clearInterval(cloudPollTimer);
+      cloudPollTimer = null;
+    }
+  } catch {
+    cloudJobList.innerHTML = `<li><span class="meta">无法加载云端任务</span></li>`;
+  }
+}
+
+async function submitCloudMacOS() {
+  let opts;
+  try {
+    opts = collectOptions();
+  } catch (err) {
+    appendLog(err.message);
+    return;
+  }
+  if (!opts.url || !opts.name) {
+    appendLog("请填写网址和应用名称");
+    return;
+  }
+  const platform = document.getElementById("cloud-platform")?.value || "macos";
+  if (platform === "android") {
+    appendLog("Android 云端打包尚未实现（T03 预留）");
+    return;
+  }
+
+  const body = {
+    platform: "macos",
+    url: opts.url,
+    name: opts.name,
+    icon: opts.icon,
+    width: opts.width,
+    height: opts.height,
+    appVersion: opts.appVersion,
+    identifier: opts.identifier,
+    hideTitleBar: opts.hideTitleBar,
+    multiArch: document.getElementById("cloud-multi-arch")?.checked === true,
+    newWindow: document.getElementById("cloud-new-window")?.checked === true,
+    targets: document.getElementById("cloud-targets")?.value || "dmg",
+  };
+
+  appendLog("—— 提交 macOS 云端任务 ——");
+  const res = await api("/api/cloud/jobs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    appendLog("提交失败：" + (data.error || res.status));
+    document.getElementById("cloud-settings")?.setAttribute("open", "");
+    return;
+  }
+  appendLog("已创建任务：" + data.job?.id + "（后台轮询 GitHub Actions，产物在 builds/macos）");
+  refreshCloudJobs();
+}
+
+document.getElementById("btn-gh-save")?.addEventListener("click", saveGitHubSettings);
+document.getElementById("btn-gh-test")?.addEventListener("click", testGitHubSettings);
+document.getElementById("btn-cloud-macos")?.addEventListener("click", submitCloudMacOS);
+document.getElementById("btn-refresh-cloud")?.addEventListener("click", refreshCloudJobs);
+
 refreshEnv();
 refreshHistory();
+loadGitHubSettings();
+refreshCloudJobs();

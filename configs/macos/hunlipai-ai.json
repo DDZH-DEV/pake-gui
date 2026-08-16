@@ -1,0 +1,14 @@
+{
+  "url": "https://hlai-pc.yingdedao.cn/",
+  "name": "HunliPai-AI",
+  "identifier": "com.hlpai.yingdedao",
+  "appVersion": "1.0.0",
+  "width": 1200,
+  "height": 780,
+  "icon": "",
+  "hideTitleBar": false,
+  "multiArch": false,
+  "newWindow": false,
+  "targets": "dmg",
+  "notes": "Fill icon with a public .icns/.png URL before running Actions if you need a custom icon. Prefer ASCII name for GitHub artifact download names."
+}

@@ -23,11 +23,12 @@ import (
 )
 
 type Server struct {
-	cfg    Config
-	mux    *http.ServeMux
-	mu     sync.Mutex
-	cancel context.CancelFunc
-	webFS  fs.FS
+	cfg          Config
+	mux          *http.ServeMux
+	mu           sync.Mutex
+	cancel       context.CancelFunc
+	cloudCancels map[string]context.CancelFunc
+	webFS        fs.FS
 }
 
 type projectRecord struct {
@@ -67,6 +68,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/preview-cmd", s.handlePreviewCmd)
 	s.mux.HandleFunc("/api/upload-icon", s.handleUploadIcon)
 	s.mux.HandleFunc("/api/icon-file", s.handleIconFile)
+	s.mux.HandleFunc("/api/cloud/github/settings", s.handleCloudGitHubSettings)
+	s.mux.HandleFunc("/api/cloud/github/test", s.handleCloudGitHubTest)
+	s.mux.HandleFunc("/api/cloud/jobs", s.handleCloudJobs)
+	s.mux.HandleFunc("/api/cloud/jobs/", s.handleCloudJobByID)
 	s.mux.Handle("/", s.spa())
 }
 

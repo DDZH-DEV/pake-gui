@@ -159,9 +159,58 @@
         <div class="form-actions">
           <button type="button" class="btn ghost" id="btn-preview">预览命令</button>
           <button type="button" class="btn danger" id="btn-cancel" hidden>取消打包</button>
-          <button type="submit" class="btn primary" id="btn-build">开始打包</button>
+          <button type="button" class="btn ghost" id="btn-cloud-macos">提交 macOS 云端</button>
+          <button type="submit" class="btn primary" id="btn-build">本机打包</button>
         </div>
       </form>
+
+      <details class="advanced cloud-box" id="cloud-settings">
+        <summary>云端打包 · GitHub 设置</summary>
+        <p class="field-hint">Windows 提交任务到 GitHub Actions 生成 macOS DMG。Token 仅保存在本机 data/github.json。</p>
+        <div class="field-grid">
+          <label class="field">
+            <span>Owner（用户名/组织）</span>
+            <input id="gh-owner" placeholder="your-name" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Repo</span>
+            <input id="gh-repo" placeholder="pake-gui" autocomplete="off" />
+          </label>
+          <label class="field span-2">
+            <span>Personal Access Token</span>
+            <input id="gh-token" type="password" placeholder="留空则保留已保存的 Token" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Workflow 文件</span>
+            <input id="gh-workflow" placeholder="build-macos.yml" value="build-macos.yml" />
+          </label>
+          <label class="field">
+            <span>分支 Ref（空=默认分支）</span>
+            <input id="gh-ref" placeholder="main" />
+          </label>
+          <label class="field">
+            <span>云端目标</span>
+            <select id="cloud-platform">
+              <option value="macos">macOS（GitHub）</option>
+              <option value="android" disabled>Android（预留）</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>macOS 产物格式</span>
+            <select id="cloud-targets">
+              <option value="dmg">dmg</option>
+              <option value="app">app</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" id="cloud-multi-arch" /> Universal（Intel+Apple，更慢）</label>
+          <label class="check"><input type="checkbox" id="cloud-new-window" /> 允许站点开新窗口</label>
+        </div>
+        <div class="form-actions" style="margin-top:0.75rem">
+          <button type="button" class="btn ghost" id="btn-gh-save">保存设置</button>
+          <button type="button" class="btn ghost" id="btn-gh-test">测试连接</button>
+          <span class="field-hint" id="gh-status">未加载</span>
+        </div>
+      </details>
     </section>
 
     <aside class="side">
@@ -189,8 +238,19 @@
       </section>
 
       <section class="panel history-panel">
+        <div class="panel-head row">
+          <div>
+            <h2>云端任务</h2>
+            <p class="field-hint" style="margin:0">GitHub Actions 任务</p>
+          </div>
+          <button type="button" class="btn tiny" id="btn-refresh-cloud">刷新</button>
+        </div>
+        <ul class="history" id="cloud-job-list"></ul>
+      </section>
+
+      <section class="panel history-panel">
         <div class="panel-head">
-          <h2>最近打包</h2>
+          <h2>最近本机打包</h2>
         </div>
         <ul class="history" id="history-list"></ul>
       </section>

@@ -1,0 +1,179 @@
+# Build a macOS app with pake-cli on GitHub-hosted macOS runners.
+# Usage: Actions → Build macOS App (Pake) → Run workflow
+name: Build macOS App (Pake)
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Website URL to package"
+        required: true
+        type: string
+      name:
+        description: "App name (prefer ASCII for artifact names, e.g. HunliPai-AI)"
+        required: true
+        type: string
+      icon:
+        description: "Icon URL (.icns / .png). Leave empty to auto-fetch site icon"
+        required: false
+        type: string
+        default: ""
+      width:
+        description: "Window width (px)"
+        required: false
+        type: string
+        default: "1200"
+      height:
+        description: "Window height (px)"
+        required: false
+        type: string
+        default: "780"
+      app_version:
+        description: "App version"
+        required: false
+        type: string
+        default: "1.0.0"
+      identifier:
+        description: "Bundle ID (e.g. com.example.app)"
+        required: false
+        type: string
+        default: ""
+      hide_title_bar:
+        description: "Hide title bar (macOS immersive)"
+        required: false
+        type: boolean
+        default: false
+      multi_arch:
+        description: "Universal binary (Intel + Apple Silicon, slower)"
+        required: false
+        type: boolean
+        default: false
+      new_window:
+        description: "Allow sites to open new windows"
+        required: false
+        type: boolean
+        default: false
+      targets:
+        description: "Output format: dmg | app (default dmg)"
+        required: false
+        type: choice
+        options:
+          - dmg
+          - app
+        default: dmg
+      job_id:
+        description: "Client job id (from Pake GUI cloud submit)"
+        required: false
+        type: string
+        default: ""
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  build-macos:
+    name: macOS
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('.github/workflows/build-macos.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install pake-cli
+        run: npm install -g pake-cli
+
+      - name: Build macOS package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ARGS=(
+            "${{ inputs.url }}"
+            --name "${{ inputs.name }}"
+            --width "${{ inputs.width }}"
+            --height "${{ inputs.height }}"
+            --app-version "${{ inputs.app_version }}"
+            --targets "${{ inputs.targets }}"
+            --json
+          )
+
+          if [ -n "${{ inputs.icon }}" ]; then
+            ARGS+=(--icon "${{ inputs.icon }}")
+          fi
+          if [ -n "${{ inputs.identifier }}" ]; then
+            ARGS+=(--identifier "${{ inputs.identifier }}")
+          fi
+          if [ "${{ inputs.hide_title_bar }}" = "true" ]; then
+            ARGS+=(--hide-title-bar)
+          fi
+          if [ "${{ inputs.multi_arch }}" = "true" ]; then
+            ARGS+=(--multi-arch)
+          fi
+          if [ "${{ inputs.new_window }}" = "true" ]; then
+            ARGS+=(--new-window)
+          fi
+
+          echo "Running: pake ${ARGS[*]}"
+          pake "${ARGS[@]}"
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist-macos
+          # Prefer files in workspace root (pake default), then search deeper.
+          shopt -s nullglob
+          found=0
+          for f in \
+            "${{ inputs.name }}".dmg \
+            "${{ inputs.name }}".app \
+            ./*.dmg \
+            ./*.app; do
+            if [ -e "$f" ]; then
+              cp -R "$f" dist-macos/
+              found=1
+            fi
+          done
+          # Fallback: search common pake/tauri output locations
+          if [ "$found" -eq 0 ]; then
+            while IFS= read -r -d '' path; do
+              cp -R "$path" dist-macos/
+              found=1
+            done < <(find . -maxdepth 6 \( -name '*.dmg' -o -name '*.app' \) -print0 2>/dev/null || true)
+          fi
+          ls -la dist-macos
+          if [ "$found" -eq 0 ]; then
+            echo "No .dmg/.app found after build"
+            find . -maxdepth 8 \( -name '*.dmg' -o -name '*.app' \) 2>/dev/null || true
+            exit 1
+          fi
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.name }}-macOS
+          path: dist-macos/
+          retention-days: 7
+          if-no-files-found: error
+          # job_id is accepted for GUI correlation; artifact name stays stable for download matching

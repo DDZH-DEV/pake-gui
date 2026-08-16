@@ -1,0 +1,9 @@
+*.exe
+*.test
+builds/*
+!builds/.gitkeep
+data/
+.DS_Store
+PakeGUI.exe
+PakeGUI-console.exe
+pake-gui.exe

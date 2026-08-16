@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pake GUI · 网页打包桌面应用</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <p class="brand-name">Pake GUI</p>
+        <p class="brand-tag">基于 Pake · 无 WebView2 时自动改用浏览器</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button type="button" class="btn ghost" id="btn-open-out">打开输出目录</button>
+      <button type="button" class="btn ghost" id="btn-open-log">打开日志</button>
+      <button type="button" class="btn ghost" id="btn-refresh-env">检测环境</button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="panel form-panel">
+      <div class="panel-head">
+        <h1>新建打包</h1>
+        <p>填写网址或本地路径，一键调用 <code>pake-cli</code> 生成安装包。</p>
+      </div>
+
+      <form id="build-form" autocomplete="off">
+        <div class="field-grid">
+          <label class="field span-2">
+            <span>网址 / 本地路径</span>
+            <input name="url" required placeholder="https://example.com 或 ./dist 或 ./index.html" />
+          </label>
+
+          <label class="field">
+            <span>应用名称</span>
+            <input name="name" required placeholder="MyApp" />
+          </label>
+
+          <label class="field">
+            <span>版本号</span>
+            <input name="appVersion" placeholder="1.0.0" value="1.0.0" />
+          </label>
+
+          <label class="field">
+            <span>窗口宽度</span>
+            <input name="width" type="number" min="320" value="1200" />
+          </label>
+
+          <label class="field">
+            <span>窗口高度</span>
+            <input name="height" type="number" min="240" value="780" />
+          </label>
+
+          <div class="field span-2 icon-field">
+            <span>应用图标（可选，留空自动抓取）</span>
+            <div class="icon-picker">
+              <div class="icon-preview" id="icon-preview" aria-hidden="true">
+                <img id="icon-preview-img" alt="" hidden />
+                <span id="icon-preview-placeholder">无</span>
+              </div>
+              <div class="icon-controls">
+                <label class="btn ghost file-btn">
+                  选择图片
+                  <input type="file" id="icon-file" accept=".png,.ico,.icns,.jpg,.jpeg,.webp,image/png,image/x-icon,image/jpeg,image/webp" hidden />
+                </label>
+                <button type="button" class="btn ghost" id="btn-clear-icon">清除</button>
+                <input name="icon" id="icon-path" placeholder="或粘贴 https://… / 本地路径" />
+              </div>
+            </div>
+            <p class="field-hint" id="icon-hint">支持 png / ico / icns / jpg / webp，最大 8MB</p>
+          </div>
+
+          <label class="field">
+            <span>窗口标题</span>
+            <input name="title" placeholder="默认使用应用名" />
+          </label>
+
+          <label class="field">
+            <span>初始缩放 %</span>
+            <input name="zoom" type="number" min="50" max="200" value="100" />
+          </label>
+
+          <label class="field span-2">
+            <span>输出目录（默认限制在 builds 内；填绝对路径将要求确认）</span>
+            <input name="outDir" id="out-dir" placeholder="默认 ./builds" />
+          </label>
+        </div>
+
+        <details class="advanced" open>
+          <summary>窗口与行为</summary>
+          <div class="toggles">
+            <label class="check"><input type="checkbox" name="hideWindowDecorations" /> 隐藏窗口装饰（Win/Linux）</label>
+            <label class="check"><input type="checkbox" name="hideTitleBar" /> 隐藏标题栏（macOS）</label>
+            <label class="check"><input type="checkbox" name="fullscreen" /> 全屏启动</label>
+            <label class="check"><input type="checkbox" name="maximize" /> 最大化启动</label>
+            <label class="check"><input type="checkbox" name="alwaysOnTop" /> 窗口置顶</label>
+            <label class="check"><input type="checkbox" name="darkMode" /> 深色模式</label>
+            <label class="check"><input type="checkbox" name="showSystemTray" /> 系统托盘</label>
+            <label class="check"><input type="checkbox" name="startToTray" /> 启动到托盘</label>
+            <label class="check"><input type="checkbox" name="multiInstance" /> 允许多实例</label>
+            <label class="check"><input type="checkbox" name="multiWindow" /> 多窗口</label>
+            <label class="check"><input type="checkbox" name="enableFind" /> 页内查找</label>
+            <label class="check"><input type="checkbox" name="enableDragDrop" /> 拖放文件</label>
+            <label class="check"><input type="checkbox" name="incognito" /> 无痕模式</label>
+            <label class="check"><input type="checkbox" name="wasm" /> 启用 WASM</label>
+            <label class="check"><input type="checkbox" name="forceInternalNavigation" /> 强制应用内导航</label>
+            <label class="check"><input type="checkbox" name="ignoreCertificateErrors" /> 忽略证书错误</label>
+            <label class="check"><input type="checkbox" name="useLocalFile" /> 本地文件模式</label>
+            <label class="check"><input type="checkbox" name="debug" /> Debug 构建</label>
+            <label class="check"><input type="checkbox" name="keepBinary" /> 保留原始二进制</label>
+            <label class="check"><input type="checkbox" name="iterativeBuild" /> 快速迭代构建</label>
+          </div>
+        </details>
+
+        <details class="advanced">
+          <summary>高级选项</summary>
+          <div class="field-grid">
+            <label class="field">
+              <span>Bundle ID</span>
+              <input name="identifier" placeholder="com.example.app" />
+            </label>
+            <label class="field">
+              <span>Targets</span>
+              <input name="targets" placeholder="Windows: x64 / arm64" />
+            </label>
+            <label class="field span-2">
+              <span>注入 JS/CSS（逗号分隔路径）</span>
+              <input name="inject" placeholder="./inject.js, ./style.css" />
+            </label>
+            <label class="field span-2">
+              <span>Safe Domains（逗号分隔）</span>
+              <input name="safeDomain" placeholder="okta.com,slack.com" />
+            </label>
+            <label class="field span-2">
+              <span>User Agent</span>
+              <input name="userAgent" placeholder="自定义 UA" />
+            </label>
+            <label class="field">
+              <span>激活快捷键</span>
+              <input name="activationShortcut" placeholder="CmdOrControl+Shift+P" />
+            </label>
+            <label class="field">
+              <span>代理 URL</span>
+              <input name="proxyUrl" placeholder="http://127.0.0.1:7890" />
+            </label>
+          </div>
+        </details>
+
+        <div class="form-actions">
+          <button type="button" class="btn ghost" id="btn-preview">预览命令</button>
+          <button type="button" class="btn danger" id="btn-cancel" hidden>取消打包</button>
+          <button type="submit" class="btn primary" id="btn-build">开始打包</button>
+        </div>
+      </form>
+    </section>
+
+    <aside class="side">
+      <section class="panel env-panel">
+        <div class="panel-head row">
+          <div>
+            <h2>环境状态</h2>
+            <p id="env-summary">检测中…</p>
+          </div>
+          <button type="button" class="btn tiny" id="btn-install-pake">安装 pake-cli</button>
+        </div>
+        <ul class="tool-list" id="tool-list"></ul>
+      </section>
+
+      <section class="panel log-panel">
+        <div class="panel-head row">
+          <div>
+            <h2>构建日志</h2>
+            <p id="log-status">等待开始</p>
+          </div>
+          <button type="button" class="btn tiny" id="btn-clear-log">清空</button>
+        </div>
+        <pre id="log" class="log" aria-live="polite"></pre>
+        <p class="cmd-preview" id="cmd-preview"></p>
+      </section>
+
+      <section class="panel history-panel">
+        <div class="panel-head">
+          <h2>最近打包</h2>
+        </div>
+        <ul class="history" id="history-list"></ul>
+      </section>
+    </aside>
+  </main>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

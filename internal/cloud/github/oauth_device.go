@@ -101,6 +101,10 @@ func StartDeviceFlow(ctx context.Context, dataDir, clientID string) (*DeviceStar
 	if clientID == "" {
 		return nil, fmt.Errorf("请先填写 GitHub OAuth App 的 Client ID（开发者设置里启用 Device Flow）")
 	}
+	// URL 里的数字是 App 编号，不是 Client ID。
+	if isDigitsOnly(clientID) {
+		return nil, fmt.Errorf("你填写的像是页面 URL 里的应用编号，不是 Client ID。请到 OAuth App 详情页复制「Client ID」（一般以 Ov23 或 Iv1. 开头）")
+	}
 
 	form := url.Values{}
 	form.Set("client_id", clientID)
@@ -319,4 +323,16 @@ func Logout(dataDir string) error {
 	st.Token = ""
 	st.Login = ""
 	return SaveSettingsAllowEmptyToken(dataDir, st)
+}
+
+func isDigitsOnly(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }

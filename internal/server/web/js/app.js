@@ -86,7 +86,7 @@ function collectOptions() {
     return Number.isFinite(v) && v > 0 ? v : 0;
   };
 
-  const injectRaw = get("inject");
+  const injectRaw = document.getElementById("inject-value")?.value?.trim() || get("inject");
   const inject = injectRaw
     ? injectRaw.split(",").map((s) => s.trim()).filter(Boolean)
     : [];
@@ -136,7 +136,7 @@ function collectOptions() {
   return opts;
 }
 
-function fillForm(opts) {
+function fillForm(opts, goTab) {
   if (!opts) return;
   for (const [key, value] of Object.entries(opts)) {
     const el = form.elements[key];
@@ -144,12 +144,47 @@ function fillForm(opts) {
     if (el.type === "checkbox") {
       el.checked = Boolean(value);
     } else if (key === "inject" && Array.isArray(value)) {
-      el.value = value.join(", ");
+      setInjectSelection(value);
+    } else if (key === "targets" && form.elements.targets) {
+      form.elements.targets.value = value == null ? "" : String(value);
     } else if (value != null && value !== "") {
       el.value = value;
     }
   }
-  switchTab("pack");
+
+  // Cloud-only fields (outside the shared form controls)
+  const multi = document.getElementById("cloud-multi-arch");
+  if (multi && opts.multiArch != null) multi.checked = Boolean(opts.multiArch);
+  const nw = document.getElementById("cloud-new-window");
+  if (nw && opts.newWindow != null) nw.checked = Boolean(opts.newWindow);
+  const targets = document.getElementById("cloud-targets");
+  if (targets && opts.targets) {
+    const t = String(opts.targets).toLowerCase();
+    if (t === "app" || t === "dmg") targets.value = t;
+  }
+
+  const icon = (opts.icon || "").trim();
+  if (/^https?:\/\//i.test(icon)) {
+    setIconPreview(icon);
+    if (iconHint) iconHint.textContent = "已回填网络图标";
+  } else if (icon) {
+    const base = icon.split(/[/\\]/).pop();
+    if (base && /\.(png|ico|icns|jpe?g|webp)$/i.test(base)) {
+      setIconPreview(
+        "/api/icon-file?name=" + encodeURIComponent(base) + "&token=" + encodeURIComponent(TOKEN)
+      );
+    }
+    if (iconHint) iconHint.textContent = "已回填图标：" + base;
+  }
+
+  const tab = goTab || "pack";
+  switchTab(tab);
+  const label = opts.name || "未命名";
+  appendLog(
+    tab === "cloud"
+      ? `已回填「${label}」→ 云端 Tab，可直接提交 macOS`
+      : `已回填「${label}」→ 打包 Tab（也可再切到「云端」打 macOS）`
+  );
 }
 
 async function refreshEnv() {
@@ -174,6 +209,9 @@ async function refreshEnv() {
     if (data.builds && !outDirInput.placeholder) {
       outDirInput.placeholder = data.builds;
     }
+    if (data.injectDir && injectDirInput && !injectDirInput.value) {
+      injectDirInput.value = data.injectDir;
+    }
   } catch (err) {
     envSummary.textContent = "环境检测失败：" + err.message;
   }
@@ -188,17 +226,24 @@ async function refreshHistory() {
       historyList.innerHTML = `<li><span class="meta">暂无记录</span></li>`;
       return;
     }
-    for (const item of items.slice(0, 8)) {
+    for (const item of items.slice(0, 20)) {
       const li = document.createElement("li");
       const left = document.createElement("div");
       const ok = item.result?.ok;
-      left.innerHTML = `<button type="button" data-id="${item.id}">${item.options?.name || "未命名"}</button>
-        <div class="meta">${item.options?.url || ""}</div>`;
+      const opts = item.options || {};
+      left.innerHTML = `<button type="button" class="hist-name">${opts.name || "未命名"}</button>
+        <div class="meta">${opts.url || ""}</div>
+        <div class="hist-actions">
+          <button type="button" class="btn tiny hist-pack">回填·本机</button>
+          <button type="button" class="btn tiny hist-cloud">回填·云端</button>
+        </div>`;
       const badge = document.createElement("span");
       badge.className = `badge ${ok ? "ok" : "bad"}`;
       badge.textContent = ok ? "成功" : "失败";
       li.append(left, badge);
-      li.querySelector("button").addEventListener("click", () => fillForm(item.options));
+      left.querySelector(".hist-name").addEventListener("click", () => fillForm(opts, "pack"));
+      left.querySelector(".hist-pack").addEventListener("click", () => fillForm(opts, "pack"));
+      left.querySelector(".hist-cloud").addEventListener("click", () => fillForm(opts, "cloud"));
       historyList.appendChild(li);
     }
   } catch {
@@ -429,6 +474,154 @@ iconPreview.addEventListener("drop", (e) => {
 
 form.addEventListener("submit", startBuild);
 
+// —— Inject JS/CSS picker ——
+const injectDirInput = document.getElementById("inject-dir");
+const injectListEl = document.getElementById("inject-list");
+const injectValueInput = document.getElementById("inject-value");
+const injectHint = document.getElementById("inject-hint");
+let injectFilesCache = [];
+
+function syncInjectValue() {
+  if (!injectValueInput || !injectListEl) return;
+  const paths = [...injectListEl.querySelectorAll('input[type="checkbox"][data-path]:checked')].map(
+    (el) => el.getAttribute("data-path")
+  );
+  injectValueInput.value = paths.join(",");
+  if (injectHint) {
+    injectHint.textContent = paths.length
+      ? `已选 ${paths.length} 个文件`
+      : "可将脚本放到程序目录 data/inject/ 下";
+  }
+}
+
+function renderInjectList(files, selectedPaths) {
+  if (!injectListEl) return;
+  const selected = new Set((selectedPaths || []).map((p) => p.replace(/\//g, "\\").toLowerCase()));
+  injectFilesCache = files || [];
+  if (!injectFilesCache.length) {
+    injectListEl.innerHTML = `<p class="field-hint">未找到 .js / .css。可上传文件或换目录后重新扫描。</p>`;
+    syncInjectValue();
+    return;
+  }
+  injectListEl.innerHTML = "";
+  for (const f of injectFilesCache) {
+    const pathNorm = String(f.path || "").replace(/\//g, "\\").toLowerCase();
+    const checked = selected.has(pathNorm) ? "checked" : "";
+    const sizeKB = f.size ? (f.size / 1024).toFixed(1) + " KB" : "";
+    const row = document.createElement("label");
+    row.className = "inject-item check";
+    row.innerHTML = `<input type="checkbox" data-path="${String(f.path).replace(/"/g, "&quot;")}" ${checked} />
+      <div><strong>${f.name}</strong><div class="meta">${f.path}${sizeKB ? " · " + sizeKB : ""}</div></div>`;
+    row.querySelector("input").addEventListener("change", syncInjectValue);
+    injectListEl.appendChild(row);
+  }
+  syncInjectValue();
+}
+
+async function scanInjectDir(keepSelection) {
+  const prev = keepSelection
+    ? [...(injectListEl?.querySelectorAll('input[type="checkbox"][data-path]:checked') || [])].map((el) =>
+        el.getAttribute("data-path")
+      )
+    : injectValueInput?.value
+      ? injectValueInput.value.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+  const dir = injectDirInput?.value?.trim() || "";
+  if (injectHint) injectHint.textContent = "正在扫描…";
+  try {
+    const res = await api("/api/inject/list", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dir }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      if (injectHint) injectHint.textContent = data.error || "扫描失败";
+      injectListEl.innerHTML = `<p class="field-hint">${data.error || "扫描失败"}</p>`;
+      return;
+    }
+    if (injectDirInput && data.dir) injectDirInput.value = data.dir;
+    renderInjectList(data.files || [], prev);
+    if (injectHint) injectHint.textContent = `共 ${data.count || 0} 个文件`;
+  } catch (err) {
+    if (injectHint) injectHint.textContent = "扫描失败：" + err.message;
+  }
+}
+
+function setInjectSelection(paths) {
+  const list = (paths || []).map((p) => String(p).trim()).filter(Boolean);
+  if (injectValueInput) injectValueInput.value = list.join(",");
+  // If list already rendered, just check boxes; else scan then apply.
+  const boxes = injectListEl?.querySelectorAll('input[type="checkbox"][data-path]');
+  if (boxes && boxes.length) {
+    const want = new Set(list.map((p) => p.replace(/\//g, "\\").toLowerCase()));
+    boxes.forEach((el) => {
+      const p = (el.getAttribute("data-path") || "").replace(/\//g, "\\").toLowerCase();
+      el.checked = want.has(p);
+    });
+    syncInjectValue();
+    return;
+  }
+  scanInjectDir(false).then(() => {
+    if (!injectListEl) return;
+    const want = new Set(list.map((p) => p.replace(/\//g, "\\").toLowerCase()));
+    injectListEl.querySelectorAll('input[type="checkbox"][data-path]').forEach((el) => {
+      const p = (el.getAttribute("data-path") || "").replace(/\//g, "\\").toLowerCase();
+      el.checked = want.has(p);
+    });
+    // Also show paths not in folder as checked virtual? skip — re-render with union
+    const missing = list.filter((p) => {
+      const n = p.replace(/\//g, "\\").toLowerCase();
+      return ![...injectFilesCache].some((f) => String(f.path).replace(/\//g, "\\").toLowerCase() === n);
+    });
+    if (missing.length) {
+      renderInjectList(
+        [
+          ...injectFilesCache,
+          ...missing.map((p) => ({
+            name: p.split(/[/\\]/).pop(),
+            path: p,
+            ext: "",
+            size: 0,
+          })),
+        ],
+        list
+      );
+    } else {
+      syncInjectValue();
+    }
+  });
+}
+
+document.getElementById("btn-inject-scan")?.addEventListener("click", () => scanInjectDir(true));
+document.getElementById("inject-file")?.addEventListener("change", async () => {
+  const input = document.getElementById("inject-file");
+  const files = input?.files;
+  if (!files?.length) return;
+  const fd = new FormData();
+  for (const f of files) fd.append("files", f);
+  if (injectHint) injectHint.textContent = "正在上传…";
+  try {
+    const res = await api("/api/inject/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!data.ok) {
+      if (injectHint) injectHint.textContent = data.error || "上传失败";
+      return;
+    }
+    if (injectDirInput && data.dir) injectDirInput.value = data.dir;
+    const prev = injectValueInput?.value
+      ? injectValueInput.value.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+    await scanInjectDir(false);
+    setInjectSelection([...(data.paths || []), ...prev]);
+    appendLog("已上传注入文件：" + (data.paths || []).join(", "));
+  } catch (err) {
+    if (injectHint) injectHint.textContent = "上传失败：" + err.message;
+  } finally {
+    input.value = "";
+  }
+});
+
 // —— Cloud (GitHub macOS) ——
 const ghStatus = document.getElementById("gh-status");
 const ghLoginLabel = document.getElementById("gh-login-label");
@@ -446,9 +639,14 @@ function applyGitHubSettingsView(s) {
   document.getElementById("gh-ref").value = s.ref || "";
   document.getElementById("gh-client-id").value = s.clientId || "";
   document.getElementById("gh-token").value = "";
-  document.getElementById("gh-token").placeholder = s.tokenMasked
-    ? `已保存 ${s.tokenMasked}（留空保留）`
-    : "可选备用 PAT";
+  const tokenHint = document.getElementById("gh-token-hint");
+  if (s.tokenMasked) {
+    document.getElementById("gh-token").placeholder = "留空则保留已保存的 Token";
+    if (tokenHint) tokenHint.textContent = "当前已保存：" + s.tokenMasked;
+  } else {
+    document.getElementById("gh-token").placeholder = "粘贴 ghp_… / gho_…；留空则保留已保存的";
+    if (tokenHint) tokenHint.textContent = "";
+  }
   if (s.configured && s.login) {
     ghLoginLabel.textContent = "已登录 @" + s.login;
     btnGhLogout.hidden = false;
@@ -554,6 +752,13 @@ async function startGitHubOAuth() {
     owner: document.getElementById("gh-owner").value.trim() || "DDZH-DEV",
     repo: document.getElementById("gh-repo").value.trim() || "pake-gui",
   };
+  if (/^\d+$/.test(body.clientId)) {
+    ghStatus.textContent = "Client ID 不正确";
+    ghDeviceHint.textContent =
+      "URL 里的数字不是 Client ID。请到 OAuth App 详情页复制「Client ID」（通常以 Ov23 或 Iv1. 开头）";
+    appendLog("Client ID 疑似填成了应用编号：" + body.clientId);
+    return;
+  }
   // Persist client id / repo first
   await api("/api/cloud/github/settings", {
     method: "POST",
@@ -568,7 +773,7 @@ async function startGitHubOAuth() {
   });
 
   ghStatus.textContent = "正在发起授权…";
-  ghDeviceHint.textContent = "正在打开浏览器…";
+  ghDeviceHint.textContent = "正在向 GitHub 申请设备码…";
   const res = await api("/api/cloud/github/oauth/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -582,11 +787,25 @@ async function startGitHubOAuth() {
     return;
   }
   const device = data.device || {};
+  const openUrl = data.openUrl || device.verificationUriComplete || device.verificationUri || "https://github.com/login/device";
   ghDeviceCode.hidden = false;
   ghDeviceCode.textContent = device.userCode || "";
-  ghDeviceHint.textContent = "浏览器已打开；若未打开，请访问 " + (device.verificationUri || "https://github.com/login/device");
+  ghDeviceHint.innerHTML =
+    (data.opened ? "已尝试打开浏览器。" : "未能自动打开浏览器。") +
+    ' 请手动打开：<a href="' +
+    openUrl.replace(/"/g, "&quot;") +
+    '" target="_blank" rel="noopener">' +
+    openUrl.replace(/</g, "&lt;") +
+    "</a>，并输入上方设备码。";
+  // Also try from the WebView itself.
+  try {
+    window.open(openUrl, "_blank");
+  } catch (_) {}
   ghStatus.textContent = "等待授权确认…";
-  appendLog("GitHub 设备码：" + (device.userCode || "") + " → " + (device.verificationUri || ""));
+  appendLog("GitHub 设备码：" + (device.userCode || "") + " → " + openUrl);
+  if (data.openError) {
+    appendLog("自动打开浏览器失败：" + data.openError);
+  }
   oauthPollTimer = setInterval(() => {
     pollOAuthStatus().catch(() => {});
   }, 2000);
@@ -633,21 +852,47 @@ async function refreshCloudJobs() {
         el.innerHTML = `<li><span class="meta">暂无云端任务</span></li>`;
         return;
       }
-      for (const job of jobs.slice(0, 12)) {
+      for (const job of jobs.slice(0, 20)) {
         const st = job.status?.state || "";
         if (st === "running" || st === "queued") needPoll = true;
         const li = document.createElement("li");
         const left = document.createElement("div");
-        const name = job.request?.name || job.id;
-        const plat = job.request?.platform || "macos";
-        left.innerHTML = `<button type="button">${name}</button>
-          <div class="meta">${plat} · ${job.id}<br/>${job.status?.message || ""}</div>`;
+        const req = job.request || {};
+        const name = req.name || job.id;
+        const plat = req.platform || "macos";
+        left.innerHTML = `<button type="button" class="hist-name">${name}</button>
+          <div class="meta">${plat} · ${job.id}<br/>${job.status?.message || ""}</div>
+          <div class="hist-actions">
+            <button type="button" class="btn tiny hist-fill">回填</button>
+            <button type="button" class="btn tiny hist-open">打开产物</button>
+          </div>`;
         const badge = document.createElement("span");
         const b = stateBadge(st);
         badge.className = `badge ${b.cls}`;
         badge.textContent = b.text;
         li.append(left, badge);
-        left.querySelector("button").addEventListener("click", async () => {
+
+        const refill = () => {
+          fillForm(
+            {
+              url: req.url,
+              name: req.name,
+              icon: req.icon,
+              width: req.width,
+              height: req.height,
+              appVersion: req.appVersion,
+              identifier: req.identifier,
+              hideTitleBar: req.hideTitleBar,
+              multiArch: req.multiArch,
+              newWindow: req.newWindow,
+              targets: req.targets,
+            },
+            "cloud"
+          );
+        };
+        left.querySelector(".hist-name").addEventListener("click", refill);
+        left.querySelector(".hist-fill").addEventListener("click", refill);
+        left.querySelector(".hist-open").addEventListener("click", async () => {
           await api(`/api/cloud/jobs/${encodeURIComponent(job.id)}?action=open`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -760,7 +1005,7 @@ document.getElementById("btn-cloud-macos")?.addEventListener("click", submitClou
 document.getElementById("btn-refresh-cloud")?.addEventListener("click", refreshCloudJobs);
 document.getElementById("btn-refresh-cloud-2")?.addEventListener("click", refreshCloudJobs);
 
-refreshEnv();
+refreshEnv().then(() => scanInjectDir(false));
 refreshHistory();
 loadGitHubSettings();
 refreshCloudJobs();

@@ -33,11 +33,19 @@ failed to run ...\light.exe
 ## 云端：提示请先保存 GitHub 设置 / 未登录
 
 1. 打开 **云端** Tab  
-2. 填写 Client ID 并 **使用 GitHub 授权**，或粘贴 PAT  
+2. 填写 **OAuth Client ID**（不是设置页 URL 里的数字编号）并 **使用 GitHub 授权**，或粘贴 PAT  
 3. Owner/Repo 确认无误 → **测试连接**  
 4. 确认仓库已包含 `.github/workflows/build-macos.yml` 且已 push  
 
 详见 [github-oauth.md](./github-oauth.md)。
+
+---
+
+## 授权：显示「正在打开浏览器」但没打开
+
+1. 确认 Client ID 正确（常见错误：填成了 `3797658` 这类 App 编号）  
+2. 新版本会用 ShellExecute 打开，并显示**可点击链接 + 设备码**；也可手动打开 https://github.com/login/device  
+3. OAuth App 需**启用 Device Flow**  
 
 ---
 
@@ -84,6 +92,19 @@ failed to run ...\light.exe
 - 本机：确认格式为 png/ico/icns/jpg/webp，≤ 8MB  
 - 云端：需有推送仓库内容的权限（OAuth `repo`）  
 - 私有仓：GUI 使用仓库内路径 `ci-assets/macos/...`，不要依赖 raw 公网 URL  
+
+---
+
+## 注入 JS/CSS 扫描不到文件
+
+- 默认目录：`data/inject/`（将 `.js` / `.css` 放入后点「扫描」）  
+- 也可「上传文件」；自定义路径需在程序 `data` 目录内  
+
+---
+
+## 历史任务如何接着打 Mac
+
+**任务** Tab → 本机记录 → **回填·云端** → 在云端 Tab 提交 macOS。
 
 ---
 

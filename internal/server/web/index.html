@@ -100,29 +100,47 @@
               </label>
             </div>
 
-            <details class="advanced">
+            <details class="advanced" open>
               <summary>窗口与行为</summary>
-              <div class="toggles">
-                <label class="check"><input type="checkbox" name="hideWindowDecorations" /> 隐藏窗口装饰（Win/Linux）</label>
-                <label class="check"><input type="checkbox" name="hideTitleBar" /> 隐藏标题栏（macOS）</label>
-                <label class="check"><input type="checkbox" name="fullscreen" /> 全屏启动</label>
-                <label class="check"><input type="checkbox" name="maximize" /> 最大化启动</label>
-                <label class="check"><input type="checkbox" name="alwaysOnTop" /> 窗口置顶</label>
-                <label class="check"><input type="checkbox" name="darkMode" /> 深色模式</label>
-                <label class="check"><input type="checkbox" name="showSystemTray" /> 系统托盘</label>
-                <label class="check"><input type="checkbox" name="startToTray" /> 启动到托盘</label>
-                <label class="check"><input type="checkbox" name="multiInstance" /> 允许多实例</label>
-                <label class="check"><input type="checkbox" name="multiWindow" /> 多窗口</label>
-                <label class="check"><input type="checkbox" name="enableFind" /> 页内查找</label>
-                <label class="check"><input type="checkbox" name="enableDragDrop" /> 拖放文件</label>
-                <label class="check"><input type="checkbox" name="incognito" /> 无痕模式</label>
-                <label class="check"><input type="checkbox" name="wasm" /> 启用 WASM</label>
-                <label class="check"><input type="checkbox" name="forceInternalNavigation" /> 强制应用内导航</label>
-                <label class="check"><input type="checkbox" name="ignoreCertificateErrors" /> 忽略证书错误</label>
-                <label class="check"><input type="checkbox" name="useLocalFile" /> 本地文件模式</label>
-                <label class="check"><input type="checkbox" name="debug" /> Debug 构建</label>
-                <label class="check"><input type="checkbox" name="keepBinary" /> 保留原始二进制</label>
-                <label class="check"><input type="checkbox" name="iterativeBuild" /> 快速迭代构建</label>
+              <p class="field-hint toggle-note">勾选后会写入打包命令。分平台项在不支持的系统上通常被 Pake 忽略；打云端 macOS 时「仅 macOS」选项会生效。</p>
+
+              <div class="toggle-group">
+                <h3 class="toggle-group-title">全平台 <span class="plat-tag all">Win · macOS · Linux</span></h3>
+                <div class="toggles">
+                  <label class="check"><input type="checkbox" name="fullscreen" /> 全屏启动</label>
+                  <label class="check"><input type="checkbox" name="maximize" /> 最大化启动</label>
+                  <label class="check"><input type="checkbox" name="alwaysOnTop" /> 窗口置顶</label>
+                  <label class="check"><input type="checkbox" name="darkMode" /> 深色模式</label>
+                  <label class="check"><input type="checkbox" name="showSystemTray" /> 系统托盘</label>
+                  <label class="check"><input type="checkbox" name="startToTray" /> 启动到托盘 <span class="opt-hint">需托盘</span></label>
+                  <label class="check"><input type="checkbox" name="multiInstance" /> 允许多实例</label>
+                  <label class="check"><input type="checkbox" name="multiWindow" /> 多窗口</label>
+                  <label class="check"><input type="checkbox" name="enableFind" /> 页内查找</label>
+                  <label class="check"><input type="checkbox" name="enableDragDrop" /> 拖放文件</label>
+                  <label class="check"><input type="checkbox" name="incognito" /> 无痕模式</label>
+                  <label class="check"><input type="checkbox" name="wasm" /> 启用 WASM</label>
+                  <label class="check"><input type="checkbox" name="forceInternalNavigation" /> 强制应用内导航</label>
+                  <label class="check"><input type="checkbox" name="ignoreCertificateErrors" /> 忽略证书错误</label>
+                  <label class="check"><input type="checkbox" name="useLocalFile" /> 本地文件模式</label>
+                  <label class="check"><input type="checkbox" name="debug" /> Debug 构建</label>
+                  <label class="check"><input type="checkbox" name="keepBinary" /> 保留原始二进制</label>
+                  <label class="check"><input type="checkbox" name="iterativeBuild" /> 快速迭代构建 <span class="opt-hint">不要安装包</span></label>
+                </div>
+              </div>
+
+              <div class="toggle-group">
+                <h3 class="toggle-group-title">Windows / Linux <span class="plat-tag win">本机常用</span></h3>
+                <div class="toggles">
+                  <label class="check"><input type="checkbox" name="hideWindowDecorations" /> 隐藏窗口装饰 <span class="opt-hint">无边框</span></label>
+                </div>
+              </div>
+
+              <div class="toggle-group">
+                <h3 class="toggle-group-title">仅 macOS <span class="plat-tag mac">云端打包生效</span></h3>
+                <div class="toggles">
+                  <label class="check"><input type="checkbox" name="hideTitleBar" /> 隐藏标题栏 <span class="opt-hint">沉浸式</span></label>
+                </div>
+                <p class="field-hint">本机在 Windows 上打包时勾选也会带上参数，但只在 macOS 产物上有效；提交云端 macOS 时会一并带上。</p>
               </div>
             </details>
 
@@ -134,13 +152,31 @@
                   <input name="identifier" placeholder="com.example.app" />
                 </label>
                 <label class="field">
-                  <span>Targets</span>
-                  <input name="targets" placeholder="Windows: x64 / arm64" />
+                  <span>Targets（本机 Windows）</span>
+                  <select name="targets">
+                    <option value="">自动检测</option>
+                    <option value="x64">Windows x64</option>
+                    <option value="arm64">Windows arm64</option>
+                  </select>
                 </label>
-                <label class="field span-2">
-                  <span>注入 JS/CSS（逗号分隔路径）</span>
-                  <input name="inject" placeholder="./inject.js, ./style.css" />
-                </label>
+
+                <div class="field span-2 inject-field">
+                  <span>注入 JS / CSS</span>
+                  <div class="inject-toolbar">
+                    <input type="text" id="inject-dir" placeholder="扫描目录（默认 data/inject）" />
+                    <button type="button" class="btn ghost" id="btn-inject-scan">扫描</button>
+                    <label class="btn ghost file-btn">
+                      上传文件
+                      <input type="file" id="inject-file" accept=".js,.css,text/javascript,text/css" multiple hidden />
+                    </label>
+                  </div>
+                  <div class="inject-list" id="inject-list">
+                    <p class="field-hint">点击「扫描」列出目录中的 .js / .css，勾选后参与打包。</p>
+                  </div>
+                  <input type="hidden" name="inject" id="inject-value" value="" />
+                  <p class="field-hint" id="inject-hint">可将脚本放到程序目录 data/inject/ 下</p>
+                </div>
+
                 <label class="field span-2">
                   <span>Safe Domains（逗号分隔）</span>
                   <input name="safeDomain" placeholder="okta.com,slack.com" />
@@ -240,12 +276,14 @@
               <label class="check"><input type="checkbox" id="cloud-new-window" /> 允许站点开新窗口</label>
             </div>
 
-            <details class="advanced">
+            <details class="advanced token-box">
               <summary>高级：手动粘贴 Token</summary>
-              <label class="field" style="display:block;margin-top:0.5rem">
+              <p class="field-hint token-box-hint">仅作备用；推荐上方「使用 GitHub 授权」。Token 只保存在本机。</p>
+              <label class="field token-field">
                 <span>Personal Access Token</span>
-                <input id="gh-token" type="password" placeholder="留空则保留已保存的 Token" autocomplete="off" />
+                <input id="gh-token" type="password" placeholder="粘贴 ghp_… / gho_…；留空则保留已保存的" autocomplete="off" spellcheck="false" />
               </label>
+              <p class="field-hint" id="gh-token-hint"></p>
             </details>
 
             <div class="form-actions">
@@ -275,7 +313,7 @@
         <div class="panel history-panel">
           <div class="panel-head">
             <h2>本机打包记录</h2>
-            <p>点击名称可回填到「打包」表单</p>
+            <p>点名称或「回填·本机」回填参数；「回填·云端」可接着打 macOS</p>
           </div>
           <ul class="history" id="history-list"></ul>
         </div>
@@ -283,7 +321,7 @@
           <div class="panel-head row">
             <div>
               <h2>云端任务记录</h2>
-              <p>点击名称打开产物目录</p>
+              <p>点「回填」重提云端；「打开产物」查看下载目录</p>
             </div>
             <button type="button" class="btn tiny" id="btn-refresh-cloud-2">刷新</button>
           </div>

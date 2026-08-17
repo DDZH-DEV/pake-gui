@@ -58,6 +58,9 @@ func (s *Server) withSecurity(next http.Handler) http.Handler {
 				if r.URL.Path == "/api/upload-icon" {
 					limit = 8 << 20 // 8MB for icons
 				}
+				if r.URL.Path == "/api/inject/upload" {
+					limit = 16 << 20
+				}
 				r.Body = http.MaxBytesReader(w, r.Body, limit)
 			}
 		}

@@ -4,6 +4,7 @@
 原则：**按平台 / 按任务分目录**，避免多次任务与多平台文件混在一起。
 
 > 面向用户的平台说明请优先看：[README.md](./README.md)、[windows.md](./windows.md)、[macos.md](./macos.md)、[android.md](./android.md)。  
+> 项目根目录还有总览：[../README.md](../README.md)。  
 > 本文偏**开发与目录约定**。
 
 ---

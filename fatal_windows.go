@@ -5,18 +5,27 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"syscall"
 	"unsafe"
 )
 
 func openBrowser(url string) {
-	cmd := exec.Command("cmd", "/c", "start", "", url)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow:    true,
-		CreationFlags: 0x08000000, // CREATE_NO_WINDOW
+	_ = shellOpen(url)
+}
+
+func shellOpen(rawURL string) error {
+	shell32 := syscall.NewLazyDLL("shell32.dll")
+	proc := shell32.NewProc("ShellExecuteW")
+	verb, _ := syscall.UTF16PtrFromString("open")
+	file, _ := syscall.UTF16PtrFromString(rawURL)
+	r, _, err := proc.Call(0, uintptr(unsafe.Pointer(verb)), uintptr(unsafe.Pointer(file)), 0, 0, 1)
+	if r <= 32 {
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("ShellExecute failed: %d", r)
 	}
-	_ = cmd.Start()
+	return nil
 }
 
 func fatalf(format string, args ...any) {

@@ -11,12 +11,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"pake-gui/internal/applog"
@@ -69,6 +66,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/preview-cmd", s.handlePreviewCmd)
 	s.mux.HandleFunc("/api/upload-icon", s.handleUploadIcon)
 	s.mux.HandleFunc("/api/icon-file", s.handleIconFile)
+	s.mux.HandleFunc("/api/inject/list", s.handleInjectList)
+	s.mux.HandleFunc("/api/inject/upload", s.handleInjectUpload)
 	s.mux.HandleFunc("/api/cloud/github/settings", s.handleCloudGitHubSettings)
 	s.mux.HandleFunc("/api/cloud/github/test", s.handleCloudGitHubTest)
 	s.mux.HandleFunc("/api/cloud/github/oauth/start", s.handleCloudGitHubOAuthStart)
@@ -121,13 +120,14 @@ func (s *Server) handleEnv(w http.ResponseWriter, r *http.Request) {
 	}
 	st := pake.CheckEnv()
 	writeJSON(w, map[string]any{
-		"os":      st.OS,
-		"arch":    st.Arch,
-		"tools":   st.Tools,
-		"ready":   st.Ready,
-		"pakeOk":  st.PakeOK,
-		"builds":  s.cfg.BuildsDir,
-		"logPath": applog.Path(),
+		"os":        st.OS,
+		"arch":      st.Arch,
+		"tools":     st.Tools,
+		"ready":     st.Ready,
+		"pakeOk":    st.PakeOK,
+		"builds":    s.cfg.BuildsDir,
+		"injectDir": s.injectDir(),
+		"logPath":   applog.Path(),
 	})
 }
 
@@ -460,21 +460,4 @@ func quote(s string) string {
 		return s
 	}
 	return `"` + s + `"`
-}
-
-func openPath(path string) error {
-	switch runtime.GOOS {
-	case "windows":
-		// Hide the intermediate cmd.exe console; "start" still opens Explorer/browser.
-		cmd := exec.Command("cmd", "/c", "start", "", path)
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			HideWindow:    true,
-			CreationFlags: 0x08000000, // CREATE_NO_WINDOW
-		}
-		return cmd.Start()
-	case "darwin":
-		return exec.Command("open", path).Start()
-	default:
-		return exec.Command("xdg-open", path).Start()
-	}
 }

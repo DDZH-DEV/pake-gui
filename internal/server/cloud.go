@@ -120,9 +120,26 @@ func (s *Server) handleCloudGitHubOAuthStart(w http.ResponseWriter, r *http.Requ
 	if openURL == "" {
 		openURL = start.VerificationURI
 	}
-	_ = openPath(openURL)
-	applog.Info("github device flow started user_code=%s", start.UserCode)
-	writeJSON(w, map[string]any{"ok": true, "device": start})
+	opened := false
+	openErr := ""
+	if err := openURLBrowser(openURL); err != nil {
+		applog.Error("open browser failed: %v", err)
+		openErr = err.Error()
+	} else {
+		opened = true
+	}
+	applog.Info("github device flow started user_code=%s opened=%v", start.UserCode, opened)
+	writeJSON(w, map[string]any{
+		"ok":     true,
+		"device": start,
+		"opened": opened,
+		"openError": openErr,
+		"openUrl": openURL,
+	})
+}
+
+func openURLBrowser(u string) error {
+	return openURL(u)
 }
 
 func (s *Server) handleCloudGitHubOAuthStatus(w http.ResponseWriter, r *http.Request) {

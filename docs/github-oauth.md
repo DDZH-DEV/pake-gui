@@ -22,8 +22,9 @@
 
 1. 打开 **云端** Tab  
 2. 粘贴 Client ID（或写入 `configs/github-oauth.json` 的 `clientId`）  
+   - **不要**填设置页 URL 里的数字（如 `…/applications/3797658` 中的 `3797658`）  
 3. 点 **使用 GitHub 授权**  
-4. 浏览器打开后确认设备码  
+4. 浏览器应自动打开；若没有，点界面上的链接，或打开 https://github.com/login/device 并输入设备码  
 5. 成功后显示「已登录 @用户名」  
 6. 点 **测试连接** 确认能读仓库与 Actions
 

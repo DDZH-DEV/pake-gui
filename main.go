@@ -33,6 +33,7 @@ func main() {
 	_ = os.MkdirAll(filepath.Join(buildsDir, "android"), 0o755)
 	_ = os.MkdirAll(dataDir, 0o755)
 	_ = os.MkdirAll(filepath.Join(dataDir, "cloud-jobs"), 0o755)
+	_ = os.MkdirAll(filepath.Join(dataDir, "inject"), 0o755)
 
 	if _, err := applog.Init(dataDir); err != nil {
 		fatalf("无法初始化日志: %v", err)

@@ -41,6 +41,19 @@ failed to run ...\light.exe
 
 ---
 
+## 云端：触发 workflow 失败 404 Not Found
+
+常见原因：**文件已在默认分支，但 GitHub 还没把它登记进 Actions**（API `/actions/workflows` 里看不到 `build-macos.yml`，只有 Dependabot 等）。Token 权限正常时也会 404。
+
+处理：
+
+1. 确认默认分支上有 `.github/workflows/build-macos.yml`  
+2. **再 push 一次该文件**（当前 workflow 带 `push.paths` 自注册；job 仅在 `workflow_dispatch` 时真正打包）  
+3. 打开 https://github.com/DDZH-DEV/pake-gui/actions ，侧边栏应出现 **Build macOS App (Pake)**  
+4. GUI 里再点 **测试连接**（应提示 workflow 已注册）后重新提交
+
+---
+
 ## 授权：显示「正在打开浏览器」但没打开
 
 1. 确认 Client ID 正确（常见错误：填成了 `3797658` 这类 App 编号）  

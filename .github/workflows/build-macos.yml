@@ -3,6 +3,12 @@
 name: Build macOS App (Pake)
 
 on:
+  # Self-path push: GitHub only indexes some workflow_dispatch-only files after a
+  # real run. Pushing this file registers it so the GUI/API can dispatch later.
+  # The job is skipped unless the event is workflow_dispatch.
+  push:
+    paths:
+      - ".github/workflows/build-macos.yml"
   workflow_dispatch:
     inputs:
       url:
@@ -73,6 +79,7 @@ env:
 jobs:
   build-macos:
     name: macOS
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     timeout-minutes: 45
 

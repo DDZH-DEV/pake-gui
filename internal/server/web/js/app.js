@@ -710,7 +710,14 @@ async function testGitHubSettings() {
     appendLog("GitHub 测试失败：" + (data.error || ""));
     return;
   }
-  ghStatus.textContent = `连接成功 · 默认分支 ${data.defaultBranch || "?"}`;
+  let msg = `连接成功 · 默认分支 ${data.defaultBranch || "?"}`;
+  if (data.workflowRegistered === false) {
+    msg += " · ⚠ macOS workflow 未注册";
+    appendLog("警告：" + (data.workflowHint || "build-macos.yml 尚未被 GitHub Actions 注册"));
+  } else if (data.workflowRegistered === true) {
+    msg += " · workflow 已注册";
+  }
+  ghStatus.textContent = msg;
   appendLog("GitHub 连接成功：" + (data.owner || "") + "/" + (data.repo || ""));
 }
 

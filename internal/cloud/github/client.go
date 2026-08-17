@@ -107,13 +107,27 @@ func (c *Client) Test(ctx context.Context) (map[string]any, error) {
 		return nil, fmt.Errorf("无法访问 Actions（检查 workflow 权限）: %w", err)
 	}
 
-	return map[string]any{
-		"ok":             true,
-		"defaultBranch":  info.DefaultBranch,
-		"canPush":        info.Permissions.Push,
-		"owner":          c.Owner,
-		"repo":           c.Repo,
-	}, nil
+	out := map[string]any{
+		"ok":            true,
+		"defaultBranch": info.DefaultBranch,
+		"canPush":       info.Permissions.Push,
+		"owner":         c.Owner,
+		"repo":          c.Repo,
+	}
+
+	// Prefer checking the configured workflow file (404 = not registered yet).
+	workflow := DefaultWorkflow
+	if _, _, e := c.do(ctx, http.MethodGet, fmt.Sprintf("/repos/%s/%s/actions/workflows/%s",
+		c.Owner, c.Repo, url.PathEscape(workflow)), nil); e != nil {
+		out["workflowRegistered"] = false
+		out["workflowHint"] = fmt.Sprintf(
+			"%s 尚未被 GitHub Actions 注册（常见于仅含 workflow_dispatch 的新文件）。请 push 一次该 workflow 文件，或到仓库 Actions 页确认可见后再试。",
+			workflow)
+	} else {
+		out["workflowRegistered"] = true
+	}
+
+	return out, nil
 }
 
 func (c *Client) DefaultBranch(ctx context.Context) (string, error) {
@@ -183,6 +197,9 @@ func (c *Client) DispatchWorkflow(ctx context.Context, workflowFile, ref string,
 	p := fmt.Sprintf("/repos/%s/%s/actions/workflows/%s/dispatches",
 		c.Owner, c.Repo, url.PathEscape(workflowFile))
 	_, _, err := c.do(ctx, http.MethodPost, p, body)
+	if err != nil && strings.Contains(err.Error(), "(404)") {
+		return fmt.Errorf("%w — 仓库里虽有该文件，但 GitHub 尚未将其注册为可调度 workflow（Actions 列表里看不到）。请确保已 push 到默认分支，并至少因 push/手动运行注册过一次；本仓库可 push `.github/workflows/%s` 触发自注册", err, workflowFile)
+	}
 	return err
 }
 

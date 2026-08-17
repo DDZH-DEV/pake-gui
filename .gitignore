@@ -16,6 +16,8 @@ ci-assets/
 android-shell/.gradle/
 android-shell/**/build/
 android-shell/local.properties
+android-shell/**/__pycache__/
+*.pyc
 PakeGUI.exe
 PakeGUI-console.exe
 pake-gui.exe

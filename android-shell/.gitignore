@@ -3,6 +3,8 @@
 /app/build/
 /local.properties
 /pake.properties
+__pycache__/
+*.pyc
 *.iml
 .idea/
 .DS_Store

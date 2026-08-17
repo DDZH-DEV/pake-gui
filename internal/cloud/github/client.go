@@ -116,15 +116,20 @@ func (c *Client) Test(ctx context.Context) (map[string]any, error) {
 	}
 
 	// Prefer checking the configured workflow file (404 = not registered yet).
-	workflow := DefaultWorkflow
-	if _, _, e := c.do(ctx, http.MethodGet, fmt.Sprintf("/repos/%s/%s/actions/workflows/%s",
-		c.Owner, c.Repo, url.PathEscape(workflow)), nil); e != nil {
+	var missing []string
+	for _, workflow := range []string{DefaultWorkflow, "build-windows.yml"} {
+		if _, _, e := c.do(ctx, http.MethodGet, fmt.Sprintf("/repos/%s/%s/actions/workflows/%s",
+			c.Owner, c.Repo, url.PathEscape(workflow)), nil); e != nil {
+			missing = append(missing, workflow)
+		}
+	}
+	if len(missing) == 0 {
+		out["workflowRegistered"] = true
+	} else {
 		out["workflowRegistered"] = false
 		out["workflowHint"] = fmt.Sprintf(
-			"%s 尚未被 GitHub Actions 注册（常见于仅含 workflow_dispatch 的新文件）。请 push 一次该 workflow 文件，或到仓库 Actions 页确认可见后再试。",
-			workflow)
-	} else {
-		out["workflowRegistered"] = true
+			"%s 尚未被 GitHub Actions 注册。请 push 对应 workflow 文件到默认分支后再试。",
+			strings.Join(missing, ", "))
 	}
 
 	return out, nil

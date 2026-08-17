@@ -264,16 +264,28 @@ func (s *Server) handleCancel(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
+		items, err := s.loadHistory()
+		if err != nil {
+			writeJSON(w, []projectRecord{})
+			return
+		}
+		writeJSON(w, items)
+	case http.MethodDelete:
+		id := strings.TrimSpace(r.URL.Query().Get("id"))
+		if id == "" {
+			writeJSON(w, map[string]any{"ok": false, "error": "缺少记录 id"})
+			return
+		}
+		if err := s.deleteHistory(id); err != nil {
+			writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true})
+	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
 	}
-	items, err := s.loadHistory()
-	if err != nil {
-		writeJSON(w, []projectRecord{})
-		return
-	}
-	writeJSON(w, items)
 }
 
 func (s *Server) handleUploadIcon(w http.ResponseWriter, r *http.Request) {
@@ -423,6 +435,53 @@ func (s *Server) loadHistory() ([]projectRecord, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+func (s *Server) deleteHistory(id string) error {
+	items, err := s.loadHistory()
+	if err != nil {
+		return err
+	}
+	out := make([]projectRecord, 0, len(items))
+	found := false
+	for _, it := range items {
+		if historyMatches(it, id) {
+			found = true
+			continue
+		}
+		out = append(out, it)
+	}
+	if !found {
+		return fmt.Errorf("记录不存在")
+	}
+	b, err := json.MarshalIndent(out, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(s.historyPath(), b, 0o644)
+}
+
+func historyMatches(it projectRecord, key string) bool {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return false
+	}
+	if strings.TrimSpace(it.ID) != "" && it.ID == key {
+		return true
+	}
+	if it.CreatedAt.IsZero() {
+		return false
+	}
+	if it.CreatedAt.Format(time.RFC3339Nano) == key || it.CreatedAt.Format(time.RFC3339) == key {
+		return true
+	}
+	if t, err := time.Parse(time.RFC3339Nano, key); err == nil && t.Equal(it.CreatedAt) {
+		return true
+	}
+	if t, err := time.Parse(time.RFC3339, key); err == nil && t.Equal(it.CreatedAt) {
+		return true
+	}
+	return false
 }
 
 func (s *Server) appendHistory(rec projectRecord) error {

@@ -169,11 +169,16 @@ function fillForm(opts, goTab) {
   if (multi && opts.multiArch != null) multi.checked = Boolean(opts.multiArch);
   const nw = document.getElementById("cloud-new-window");
   if (nw && opts.newWindow != null) nw.checked = Boolean(opts.newWindow);
+  const platEl = document.getElementById("cloud-platform");
+  if (platEl && (opts.platform === "macos" || opts.platform === "windows")) {
+    platEl.value = opts.platform;
+  }
   const targets = document.getElementById("cloud-targets");
   if (targets && opts.targets) {
     const t = String(opts.targets).toLowerCase();
-    if (t === "app" || t === "dmg") targets.value = t;
+    if (t === "app" || t === "dmg" || t === "exe") targets.value = t;
   }
+  syncCloudPlatformUI();
 
   const icon = (opts.icon || "").trim();
   if (/^https?:\/\//i.test(icon)) {
@@ -250,6 +255,7 @@ async function refreshHistory() {
         <div class="hist-actions">
           <button type="button" class="btn tiny hist-pack">回填·本机</button>
           <button type="button" class="btn tiny hist-cloud">回填·云端</button>
+          <button type="button" class="btn tiny danger hist-del">删除</button>
         </div>`;
       const badge = document.createElement("span");
       badge.className = `badge ${ok ? "ok" : "bad"}`;
@@ -258,11 +264,61 @@ async function refreshHistory() {
       left.querySelector(".hist-name").addEventListener("click", () => fillForm(opts, "pack"));
       left.querySelector(".hist-pack").addEventListener("click", () => fillForm(opts, "pack"));
       left.querySelector(".hist-cloud").addEventListener("click", () => fillForm(opts, "cloud"));
+      left.querySelector(".hist-del").addEventListener("click", () => deleteLocalHistory(item));
       historyList.appendChild(li);
     }
   } catch {
     historyList.innerHTML = `<li><span class="meta">无法加载历史</span></li>`;
   }
+}
+
+function confirmDeleteRecord(kind, name) {
+  const title = name || "未命名";
+  const extra =
+    kind === "cloud"
+      ? "只删除本机任务记录，不会删除已下载的产物文件。"
+      : "只删除列表记录，不会删除已生成的安装包。";
+  return confirm(`确定删除${kind === "cloud" ? "云端" : "本机"}记录「${title}」？\n\n${extra}`);
+}
+
+async function deleteLocalHistory(item) {
+  const opts = item?.options || {};
+  const id = item?.id || item?.createdAt || "";
+  if (!id) {
+    alert("这条记录没有 id，无法删除");
+    return;
+  }
+  if (!confirmDeleteRecord("local", opts.name)) return;
+  const res = await api("/api/history?id=" + encodeURIComponent(id), { method: "DELETE" });
+  const data = await res.json().catch(() => ({}));
+  if (!data.ok) {
+    const msg = data.error || "删除失败";
+    appendLog("删除本机记录失败：" + msg);
+    alert(msg);
+    return;
+  }
+  appendLog("已删除本机记录：" + (opts.name || id));
+  refreshHistory();
+}
+
+async function deleteCloudJob(job) {
+  const name = job?.request?.name || job?.id || "未命名";
+  if (!job?.id) return;
+  if (!confirmDeleteRecord("cloud", name)) return;
+  const res = await api(`/api/cloud/jobs/${encodeURIComponent(job.id)}?action=delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "delete" }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!data.ok) {
+    const msg = data.error || "删除失败";
+    appendLog("删除云端记录失败：" + msg);
+    alert(msg);
+    return;
+  }
+  appendLog("已删除云端记录：" + name);
+  refreshCloudJobs();
 }
 
 async function previewCmd() {
@@ -646,10 +702,25 @@ const btnGhLogout = document.getElementById("btn-gh-logout");
 let cloudPollTimer = null;
 let oauthPollTimer = null;
 
+function workflowForPlatform(platform) {
+  if (platform === "windows") return "build-windows.yml";
+  if (platform === "android") return "build-android.yml";
+  return "build-macos.yml";
+}
+
+function platformForWorkflow(workflow) {
+  const w = String(workflow || "").toLowerCase();
+  if (w.includes("windows")) return "windows";
+  if (w.includes("android")) return "android";
+  return "macos";
+}
+
 function applyGitHubSettingsView(s) {
   document.getElementById("gh-owner").value = s.owner || "DDZH-DEV";
   document.getElementById("gh-repo").value = s.repo || "pake-gui";
   document.getElementById("gh-workflow").value = s.workflow || "build-macos.yml";
+  const platEl = document.getElementById("cloud-platform");
+  if (platEl) platEl.value = platformForWorkflow(s.workflow);
   document.getElementById("gh-ref").value = s.ref || "";
   document.getElementById("gh-client-id").value = s.clientId || "";
   document.getElementById("gh-token").value = "";
@@ -677,6 +748,7 @@ function applyGitHubSettingsView(s) {
     btnGhLogin.textContent = "使用 GitHub 授权";
     ghStatus.textContent = "未配置";
   }
+  syncCloudPlatformUI();
 }
 
 async function loadGitHubSettings() {
@@ -888,6 +960,7 @@ async function refreshCloudJobs() {
           <div class="hist-actions">
             <button type="button" class="btn tiny hist-fill">回填</button>
             <button type="button" class="btn tiny hist-open">打开产物</button>
+            <button type="button" class="btn tiny danger hist-del">删除</button>
           </div>`;
         const badge = document.createElement("span");
         const b = stateBadge(st);
@@ -909,19 +982,38 @@ async function refreshCloudJobs() {
               multiArch: req.multiArch,
               newWindow: req.newWindow,
               targets: req.targets,
+              platform: plat,
             },
             "cloud"
           );
         };
         left.querySelector(".hist-name").addEventListener("click", refill);
         left.querySelector(".hist-fill").addEventListener("click", refill);
-        left.querySelector(".hist-open").addEventListener("click", async () => {
-          await api(`/api/cloud/jobs/${encodeURIComponent(job.id)}?action=open`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "open" }),
-          });
+        left.querySelector(".hist-open").addEventListener("click", async (ev) => {
+          const btn = ev.currentTarget;
+          btn.disabled = true;
+          try {
+            const res = await api(`/api/cloud/jobs/${encodeURIComponent(job.id)}?action=open`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "open" }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!data.ok) {
+              const msg = data.error || "无法打开产物目录";
+              appendLog("打开产物失败：" + msg);
+              alert(msg);
+              return;
+            }
+            appendLog("已打开产物目录：" + (data.path || ""));
+          } catch (err) {
+            appendLog("打开产物失败：" + err.message);
+            alert("打开产物失败：" + err.message);
+          } finally {
+            btn.disabled = false;
+          }
         });
+        left.querySelector(".hist-del").addEventListener("click", () => deleteCloudJob(job));
         el.appendChild(li);
       }
     };
@@ -960,8 +1052,9 @@ async function submitCloudMacOS() {
     return;
   }
 
+  const isWin = platform === "windows";
   const body = {
-    platform: "macos",
+    platform,
     url: opts.url,
     name: opts.name,
     icon: opts.icon,
@@ -970,12 +1063,14 @@ async function submitCloudMacOS() {
     appVersion: opts.appVersion,
     identifier: opts.identifier,
     hideTitleBar: opts.hideTitleBar,
-    multiArch: document.getElementById("cloud-multi-arch")?.checked === true,
+    multiArch: isWin ? false : document.getElementById("cloud-multi-arch")?.checked === true,
     newWindow: document.getElementById("cloud-new-window")?.checked === true,
-    targets: document.getElementById("cloud-targets")?.value || "dmg",
+    targets: isWin ? "exe" : document.getElementById("cloud-targets")?.value || "dmg",
   };
 
-  appendLog("—— 提交 macOS 云端任务 ——");
+  const label = isWin ? "Windows exe" : "macOS";
+  const outHint = isWin ? "builds/windows" : "builds/macos";
+  appendLog("—— 提交 " + label + " 云端任务 ——");
   const res = await api("/api/cloud/jobs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -987,9 +1082,45 @@ async function submitCloudMacOS() {
     switchTab("cloud");
     return;
   }
-  appendLog("已创建任务：" + data.job?.id + "（后台轮询 GitHub Actions，产物在 builds/macos）");
+  appendLog("已创建任务：" + data.job?.id + "（后台轮询 GitHub Actions，产物在 " + outHint + "）");
   refreshCloudJobs();
   switchTab("cloud");
+}
+
+function syncCloudPlatformUI() {
+  const platform = document.getElementById("cloud-platform")?.value || "macos";
+  const isWin = platform === "windows";
+  const wf = document.getElementById("gh-workflow");
+  if (wf) {
+    const next = workflowForPlatform(platform);
+    if ([...wf.options].some((o) => o.value === next)) wf.value = next;
+  }
+  const multi = document.getElementById("cloud-multi-arch-field");
+  const hint = document.getElementById("cloud-targets-hint");
+  const targets = document.getElementById("cloud-targets");
+  const btn = document.getElementById("btn-cloud-submit");
+  if (multi) multi.hidden = isWin;
+  if (hint) hint.hidden = !isWin;
+  if (targets) {
+    targets.disabled = isWin;
+    for (const opt of targets.options) {
+      if (opt.value === "exe") opt.hidden = !isWin;
+      if (opt.value === "dmg" || opt.value === "app") opt.hidden = isWin;
+    }
+    if (isWin) targets.value = "exe";
+    else if (targets.value === "exe") targets.value = "dmg";
+  }
+  if (btn) btn.textContent = isWin ? "提交 Windows 云端（exe）" : "提交 macOS 云端";
+}
+
+function onWorkflowChange() {
+  const wf = document.getElementById("gh-workflow")?.value;
+  const platEl = document.getElementById("cloud-platform");
+  if (!platEl) return;
+  const next = platformForWorkflow(wf);
+  if (next === "android") return;
+  platEl.value = next;
+  syncCloudPlatformUI();
 }
 
 function switchTab(name) {
@@ -1024,7 +1155,9 @@ document.getElementById("btn-gh-save")?.addEventListener("click", saveGitHubSett
 document.getElementById("btn-gh-test")?.addEventListener("click", testGitHubSettings);
 document.getElementById("btn-gh-login")?.addEventListener("click", startGitHubOAuth);
 document.getElementById("btn-gh-logout")?.addEventListener("click", logoutGitHub);
-document.getElementById("btn-cloud-macos")?.addEventListener("click", submitCloudMacOS);
+document.getElementById("btn-cloud-submit")?.addEventListener("click", submitCloudMacOS);
+document.getElementById("cloud-platform")?.addEventListener("change", syncCloudPlatformUI);
+document.getElementById("gh-workflow")?.addEventListener("change", onWorkflowChange);
 document.getElementById("btn-refresh-cloud")?.addEventListener("click", refreshCloudJobs);
 document.getElementById("btn-refresh-cloud-2")?.addEventListener("click", refreshCloudJobs);
 
@@ -1032,3 +1165,4 @@ refreshEnv().then(() => scanInjectDir(false));
 refreshHistory();
 loadGitHubSettings();
 refreshCloudJobs();
+syncCloudPlatformUI();

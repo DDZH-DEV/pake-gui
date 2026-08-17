@@ -115,6 +115,23 @@ func (s *Store) Get(id string) (*Job, error) {
 	return job, nil
 }
 
+// Delete removes data/cloud-jobs/{id}/. Does not touch builds/ artifacts.
+func (s *Store) Delete(id string) error {
+	id = sanitizeID(id)
+	if id == "" || id == "." {
+		return fmt.Errorf("bad job id")
+	}
+	dir := s.JobDir(id)
+	rel, err := filepath.Rel(s.Root, dir)
+	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+		return fmt.Errorf("invalid job path")
+	}
+	if st, err := os.Stat(dir); err != nil || !st.IsDir() {
+		return fmt.Errorf("job not found: %s", id)
+	}
+	return os.RemoveAll(dir)
+}
+
 func (s *Store) List() ([]Job, error) {
 	if err := s.EnsureRoot(); err != nil {
 		return nil, err

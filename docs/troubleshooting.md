@@ -104,6 +104,7 @@ failed to run ...\light.exe
 | 目标 | 结论 |
 |------|------|
 | macOS | 不能本机交叉编；用 [macos.md](./macos.md) 云端 |
+| Windows exe | 可不装 VS，用云端 `build-windows.yml`（公开仓免费） |
 | Android | 不能本机一键 APK；见 [android.md](./android.md) |
 
 ---

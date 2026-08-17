@@ -371,6 +371,10 @@ input:focus,
   color: var(--ink);
 }
 
+.check[hidden] {
+  display: none !important;
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;
@@ -571,6 +575,16 @@ input:focus,
 
 .hist-actions .btn.tiny:hover {
   background: rgba(11, 110, 99, 0.18);
+}
+
+.hist-actions .btn.tiny.danger {
+  background: rgba(180, 35, 24, 0.08);
+  color: var(--danger);
+  border-color: rgba(180, 35, 24, 0.22);
+}
+
+.hist-actions .btn.tiny.danger:hover {
+  background: rgba(180, 35, 24, 0.16);
 }
 
 .field-hint {

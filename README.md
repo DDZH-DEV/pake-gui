@@ -2,7 +2,7 @@
 
 把网页打成桌面应用的本地工作台：
 
-- **Windows**：本机调用 `pake-cli` 打包  
+- **Windows**：本机 `pake-cli`，或经 GitHub Actions 云端出 **exe**（免装 VS）  
 - **macOS**：经 GitHub Actions 云端出 DMG（无需本机 Mac）  
 - **Android**：目录与工作流已预留，尚未接入  
 
@@ -24,6 +24,7 @@ build.bat
 |------|------|
 | Tab 界面 | 打包 / 云端 / 任务 / 环境 |
 | 本机打包 | 图标上传、窗口选项（分平台标注）、Targets 下拉、注入 JS/CSS 扫描 |
+| 云端 Windows exe | GitHub Actions、`--iterative-build`、下载到 `builds/windows/` |
 | 云端 macOS | GitHub Device Flow 授权、提交 Actions、轮询下载到 `builds/macos/` |
 | 任务回填 | 本机记录可「回填·本机 / 回填·云端」；云端记录可回填重提 |
 | 单实例 / 日志 | `data/app.log`；子进程无黑窗闪烁 |
@@ -49,9 +50,9 @@ build.bat
 builds/{windows,macos,android}/   # 产物
 configs/{windows,macos,android}/  # 参数模板
 data/                             # 运行时（gitignore）：日志、图标、注入脚本、云端任务、Token
-.github/workflows/                # build-macos.yml / build-android.yml
+.github/workflows/                # build-macos.yml / build-windows.yml / build-android.yml
 docs/                             # 用户与开发文档
-tasks/                            # T01/T02/T03 任务规格
+tasks/                            # T01–T04 任务规格
 ```
 
 ## 开发构建

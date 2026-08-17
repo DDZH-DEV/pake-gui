@@ -4,7 +4,8 @@ package server
 
 import (
 	"fmt"
-	"os/exec"
+	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -16,15 +17,13 @@ func openPath(path string) error {
 		return fmt.Errorf("empty path")
 	}
 	if looksLikeURL(path) {
-		return openURL(path)
+		return shellOpen(path)
 	}
-	// Explorer for files/folders; hide the helper console.
-	cmd := exec.Command("explorer", path)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow:    true,
-		CreationFlags: 0x08000000,
+	// DMG/files aren't useful on Windows; open the containing folder instead.
+	if st, err := os.Stat(path); err == nil && !st.IsDir() {
+		path = filepath.Dir(path)
 	}
-	return cmd.Start()
+	return shellOpen(path)
 }
 
 func looksLikeURL(s string) bool {
@@ -33,15 +32,19 @@ func looksLikeURL(s string) bool {
 }
 
 func openURL(rawURL string) error {
-	rawURL = strings.TrimSpace(rawURL)
-	if rawURL == "" {
-		return fmt.Errorf("empty url")
+	return shellOpen(rawURL)
+}
+
+func shellOpen(target string) error {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return fmt.Errorf("empty path")
 	}
-	// ShellExecuteW is the reliable way to open the default browser from a GUI app.
+	// ShellExecuteW opens folders/URLs without a hidden console, unlike explorer.exe + CREATE_NO_WINDOW.
 	shell32 := syscall.NewLazyDLL("shell32.dll")
 	proc := shell32.NewProc("ShellExecuteW")
 	verb, _ := syscall.UTF16PtrFromString("open")
-	file, _ := syscall.UTF16PtrFromString(rawURL)
+	file, _ := syscall.UTF16PtrFromString(target)
 	r, _, err := proc.Call(
 		0,
 		uintptr(unsafe.Pointer(verb)),

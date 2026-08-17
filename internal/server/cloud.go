@@ -233,7 +233,7 @@ func (s *Server) handleCloudJobs(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]any{"ok": false, "error": android.ErrNotImplemented.Error()})
 			return
 		}
-		if platform != common.PlatformMacOS {
+		if platform != common.PlatformMacOS && platform != common.PlatformWindows {
 			writeJSON(w, map[string]any{"ok": false, "error": "暂不支持的平台: " + string(platform)})
 			return
 		}
@@ -310,13 +310,18 @@ func (s *Server) handleCloudJobByID(w http.ResponseWriter, r *http.Request) {
 				writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
 				return
 			}
-			path := job.Status.LocalOut
+			path := strings.TrimSpace(job.Status.LocalOut)
+			if path != "" {
+				if _, err := os.Stat(path); err != nil {
+					path = ""
+				}
+			}
 			if path == "" {
 				path = s.platformBuildsDir(job.Request.Platform)
 			}
 			_ = os.MkdirAll(path, 0o755)
 			if err := openPath(path); err != nil {
-				writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+				writeJSON(w, map[string]any{"ok": false, "error": err.Error(), "path": path})
 				return
 			}
 			writeJSON(w, map[string]any{"ok": true, "path": path})
@@ -328,6 +333,18 @@ func (s *Server) handleCloudJobByID(w http.ResponseWriter, r *http.Request) {
 			}
 			s.mu.Unlock()
 			_ = store.SaveStatus(id, common.Status{State: common.StateCanceled, Message: "cancel requested"})
+			writeJSON(w, map[string]any{"ok": true})
+		case "delete":
+			s.mu.Lock()
+			if c, ok := s.cloudCancels[id]; ok && c != nil {
+				c()
+				delete(s.cloudCancels, id)
+			}
+			s.mu.Unlock()
+			if err := store.Delete(id); err != nil {
+				writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+				return
+			}
 			writeJSON(w, map[string]any{"ok": true})
 		default:
 			writeJSON(w, map[string]any{"ok": false, "error": "unknown action"})
@@ -357,7 +374,7 @@ func (s *Server) runCloudJob(jobID string, st github.Settings, buildsDir string)
 	}()
 
 	store := s.cloudStore()
-	err := github.RunMacOSJob(ctx, github.MacOSSubmitOptions{
+	err := github.RunCloudJob(ctx, github.CloudJobOptions{
 		DataDir:   s.cfg.DataDir,
 		BuildsDir: buildsDir,
 		Store:     store,

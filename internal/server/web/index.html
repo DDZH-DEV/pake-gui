@@ -17,7 +17,7 @@
       <span class="brand-mark" aria-hidden="true"></span>
       <div>
         <p class="brand-name">Pake GUI</p>
-        <p class="brand-tag">本机 Windows · 云端 macOS · Android 预留</p>
+        <p class="brand-tag">本机 Windows · 云端 Windows exe / macOS · Android 预留</p>
       </div>
     </div>
     <div class="top-actions">
@@ -221,8 +221,8 @@
         <div class="tab-grid">
           <div class="panel form-panel">
             <div class="panel-head">
-              <h1>云端 macOS</h1>
-              <p>使用「打包」页的网址 / 名称 / 图标，经 GitHub Actions 生成 DMG。仓库默认 <code>DDZH-DEV/pake-gui</code>。</p>
+              <h1>云端 · Windows exe / macOS</h1>
+              <p id="cloud-head-desc">已支持 <strong>Windows exe</strong>（免装 VS，不打 MSI）、<strong>macOS DMG</strong>。Android 预留。参数来自「打包」页；仓库默认 <code>DDZH-DEV/pake-gui</code>。</p>
             </div>
 
             <div class="oauth-bar">
@@ -252,7 +252,11 @@
               </label>
               <label class="field">
                 <span>Workflow</span>
-                <input id="gh-workflow" placeholder="build-macos.yml" value="build-macos.yml" />
+                <select id="gh-workflow">
+                  <option value="build-macos.yml">build-macos.yml</option>
+                  <option value="build-windows.yml">build-windows.yml</option>
+                </select>
+                <span class="field-hint">随「云端目标」自动切换</span>
               </label>
               <label class="field">
                 <span>分支 Ref</span>
@@ -262,17 +266,20 @@
                 <span>云端目标</span>
                 <select id="cloud-platform">
                   <option value="macos">macOS（GitHub）</option>
+                  <option value="windows">Windows exe（GitHub，免装 VS）</option>
                   <option value="android" disabled>Android（预留）</option>
                 </select>
               </label>
-              <label class="field">
+              <label class="field" id="cloud-targets-field">
                 <span>产物格式</span>
                 <select id="cloud-targets">
                   <option value="dmg">dmg</option>
                   <option value="app">app</option>
+                  <option value="exe">exe</option>
                 </select>
+                <span class="field-hint" id="cloud-targets-hint" hidden>云端 Windows 固定只出 exe，不打 MSI</span>
               </label>
-              <label class="check"><input type="checkbox" id="cloud-multi-arch" /> Universal（Intel+Apple，更慢）</label>
+              <label class="check" id="cloud-multi-arch-field"><input type="checkbox" id="cloud-multi-arch" /> Universal（Intel+Apple，更慢）</label>
               <label class="check"><input type="checkbox" id="cloud-new-window" /> 允许站点开新窗口</label>
             </div>
 
@@ -289,7 +296,7 @@
             <div class="form-actions">
               <button type="button" class="btn ghost" id="btn-gh-save">保存设置</button>
               <button type="button" class="btn ghost" id="btn-gh-test">测试连接</button>
-              <button type="button" class="btn primary" id="btn-cloud-macos">提交 macOS 云端</button>
+              <button type="button" class="btn primary" id="btn-cloud-submit">提交 macOS 云端</button>
               <span class="field-hint" id="gh-status">未加载</span>
             </div>
           </div>
@@ -313,7 +320,7 @@
         <div class="panel history-panel">
           <div class="panel-head">
             <h2>本机打包记录</h2>
-            <p>点名称或「回填·本机」回填参数；「回填·云端」可接着打 macOS</p>
+            <p>点名称或「回填·本机」回填参数；「回填·云端」可接着打 macOS / Windows；「删除」需确认</p>
           </div>
           <ul class="history" id="history-list"></ul>
         </div>
@@ -321,7 +328,7 @@
           <div class="panel-head row">
             <div>
               <h2>云端任务记录</h2>
-              <p>点「回填」重提云端；「打开产物」查看下载目录</p>
+              <p>点「回填」重提云端；「打开产物」查看下载目录；「删除」需确认</p>
             </div>
             <button type="button" class="btn tiny" id="btn-refresh-cloud-2">刷新</button>
           </div>
@@ -351,6 +358,7 @@
           </div>
           <ul class="help-list">
             <li><strong>本机打包</strong>：需要 Node、pake-cli、Rust、MSVC。</li>
+            <li><strong>云端 Windows</strong>：GitHub Actions 出 exe，本机不用装 Visual Studio。</li>
             <li><strong>云端 macOS</strong>：只需 GitHub 授权；构建在 Actions 的 macos runner 上完成。</li>
             <li><strong>Android</strong>：已预留目录与工作流，尚未接入。</li>
             <li>产物目录：<code>builds/windows</code>、<code>builds/macos</code>、<code>builds/android</code>。</li>

@@ -63,7 +63,15 @@
 
 ## 与云端联动
 
-在 **任务** Tab 对本机成功记录点 **回填·云端**，可带着同一套网址/名称/图标去打 macOS。
+不想在本机安装 Visual Studio / Build Tools 时，可走 **云端 Windows exe**（GitHub `windows-latest` 已带 MSVC）：
+
+1. 「云端」Tab 选 **Windows exe（GitHub，免装 VS）**  
+2. **提交 Windows 云端（exe）**  
+3. 产物在 `builds/windows/`（只有 exe，不打 MSI）
+
+工作流：`.github/workflows/build-windows.yml`（需已 push）。公开仓库标准 runner 不计费。
+
+也可在 **任务** Tab 对本机记录点 **回填·云端**，再改目标为 Windows 或 macOS。
 
 ## 日志与排障
 

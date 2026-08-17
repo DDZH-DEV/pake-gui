@@ -50,6 +50,7 @@ pake-gui/
 │
 └── .github/workflows/
     ├── build-macos.yml             # 已有
+    ├── build-windows.yml           # Windows exe（iterative-build）
     └── build-android.yml           # 预留（可先 workflow 注释或 if: false）
 ```
 
@@ -120,7 +121,7 @@ POST   /api/cloud/github/settings     # 保存仓库与 Token
 GET    /api/cloud/github/settings     # 脱敏回显
 POST   /api/cloud/github/test         # 测 Token / Actions 权限
 
-POST   /api/cloud/jobs                # body: { platform: "macos"|"android", ...options }
+POST   /api/cloud/jobs                # body: { platform: "macos"|"windows"|"android", ...options }
 GET    /api/cloud/jobs                # 列表（读 data/cloud-jobs/*/status.json）
 GET    /api/cloud/jobs/{id}           # 详情
 POST   /api/cloud/jobs/{id}/cancel    # 能取消则取消远程 run

@@ -20,7 +20,7 @@ PakeGUI.exe -browser
 | Tab | 用途 |
 |-----|------|
 | **打包** | 网址 / 名称 / 图标；窗口与行为（分平台标注）；Targets；注入 JS/CSS；本机打包与日志 |
-| **云端** | GitHub 授权与仓库；提交 macOS 云端任务；云端进度 |
+| **云端** | GitHub 授权与仓库；提交 macOS DMG 或 Windows exe；云端进度 |
 | **任务** | 本机历史（回填·本机 / 回填·云端）；云端记录（回填 / 打开产物） |
 | **环境** | Node / npm / Rust / pake-cli 检测；一键安装 pake-cli |
 
@@ -30,7 +30,15 @@ PakeGUI.exe -browser
 
 ### 只要 Windows 安装包 / exe
 
-1. 「环境」确认 Node、pake-cli、Rust、MSVC 就绪  
+**免装 Visual Studio（推荐）**
+
+1. 代码已推到 GitHub（含 `build-windows.yml`）  
+2. 「云端」授权 → 目标选 **Windows exe** → **提交 Windows 云端（exe）**  
+3. 产物在 `builds/windows/`，只有 exe、不打 MSI  
+
+**本机打包**（需 Node、pake-cli、Rust、MSVC）
+
+1. 「环境」确认工具就绪  
 2. 「打包」填参数 → **开始本机打包**  
 3. 详见 [windows.md](./windows.md)
 
@@ -52,6 +60,6 @@ PakeGUI.exe -browser
 
 - Owner：`DDZH-DEV`
 - Repo：`pake-gui`
-- Workflow：`build-macos.yml`
+- Workflow：`build-macos.yml`（macOS）/ `build-windows.yml`（Windows exe）
 
 可在「云端」Tab 修改。

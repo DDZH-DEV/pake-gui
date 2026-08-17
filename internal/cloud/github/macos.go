@@ -15,17 +15,20 @@ import (
 	"pake-gui/internal/cloud/common"
 )
 
-// MacOSSubmitOptions drives a macOS cloud build.
-type MacOSSubmitOptions struct {
+// CloudJobOptions drives a GitHub Actions pake build (macOS DMG or Windows exe).
+type CloudJobOptions struct {
 	DataDir   string
-	BuildsDir string // typically .../builds/macos
+	BuildsDir string
 	Store     *common.Store
 	Settings  Settings
 	JobID     string
 	Log       func(string)
 }
 
-func (o MacOSSubmitOptions) log(msg string) {
+// MacOSSubmitOptions is kept as an alias for older call sites.
+type MacOSSubmitOptions = CloudJobOptions
+
+func (o CloudJobOptions) log(msg string) {
 	if o.Log != nil {
 		o.Log(msg)
 	}
@@ -34,8 +37,8 @@ func (o MacOSSubmitOptions) log(msg string) {
 	}
 }
 
-// RunMacOSJob uploads icon (if any), dispatches workflow, polls, downloads artifact.
-func RunMacOSJob(ctx context.Context, o MacOSSubmitOptions) error {
+// RunCloudJob uploads icon (if any), dispatches workflow, polls, downloads artifact.
+func RunCloudJob(ctx context.Context, o CloudJobOptions) error {
 	if o.Store == nil {
 		return fmt.Errorf("store required")
 	}
@@ -43,10 +46,15 @@ func RunMacOSJob(ctx context.Context, o MacOSSubmitOptions) error {
 	if err != nil {
 		return err
 	}
+	platform := job.Request.Platform
+	if platform == "" {
+		platform = common.PlatformMacOS
+	}
+	spec := specFor(platform)
 	client := NewClient(o.Settings)
 
 	_ = o.Store.SaveStatus(o.JobID, common.Status{State: common.StateRunning, Message: "preparing"})
-	o.log("准备 GitHub 云端 macOS 打包…")
+	o.log("准备 GitHub 云端 " + spec.Label + " 打包…")
 
 	ref := strings.TrimSpace(o.Settings.Ref)
 	if ref == "" {
@@ -56,10 +64,7 @@ func RunMacOSJob(ctx context.Context, o MacOSSubmitOptions) error {
 			return err
 		}
 	}
-	workflow := o.Settings.Workflow
-	if workflow == "" {
-		workflow = "build-macos.yml"
-	}
+	workflow := spec.Workflow
 
 	remote := job.Remote
 	remote.Workflow = workflow
@@ -85,7 +90,7 @@ func RunMacOSJob(ctx context.Context, o MacOSSubmitOptions) error {
 			_ = fail(o, err)
 			return err
 		}
-		remotePath := fmt.Sprintf("ci-assets/macos/%s/icon%s", o.JobID, ext)
+		remotePath := fmt.Sprintf("%s/%s/icon%s", spec.IconPrefix, o.JobID, ext)
 		o.log("上传图标到仓库: " + remotePath)
 		raw, err := client.UploadContent(ctx, ref, remotePath, data, "ci: upload icon for "+o.JobID)
 		if err != nil {
@@ -104,18 +109,20 @@ func RunMacOSJob(ctx context.Context, o MacOSSubmitOptions) error {
 	}
 
 	inputs := map[string]string{
-		"url":            job.Request.URL,
-		"name":           job.Request.Name,
-		"icon":           iconInput,
-		"width":          itoaDefault(job.Request.Width, 1200),
-		"height":         itoaDefault(job.Request.Height, 780),
-		"app_version":    strDefault(job.Request.AppVersion, "1.0.0"),
-		"identifier":     job.Request.Identifier,
-		"hide_title_bar": FormatBool(job.Request.HideTitleBar),
-		"multi_arch":     FormatBool(job.Request.MultiArch),
-		"new_window":     FormatBool(job.Request.NewWindow),
-		"targets":        strDefault(job.Request.Targets, "dmg"),
-		"job_id":         o.JobID,
+		"url":         job.Request.URL,
+		"name":        job.Request.Name,
+		"icon":        iconInput,
+		"width":       itoaDefault(job.Request.Width, 1200),
+		"height":      itoaDefault(job.Request.Height, 780),
+		"app_version": strDefault(job.Request.AppVersion, "1.0.0"),
+		"identifier":  job.Request.Identifier,
+		"new_window":  FormatBool(job.Request.NewWindow),
+		"job_id":      o.JobID,
+	}
+	if platform != common.PlatformWindows {
+		inputs["hide_title_bar"] = FormatBool(job.Request.HideTitleBar)
+		inputs["multi_arch"] = FormatBool(job.Request.MultiArch)
+		inputs["targets"] = strDefault(job.Request.Targets, spec.DefaultTargets)
 	}
 
 	_ = o.Store.SaveRemote(o.JobID, remote)
@@ -150,7 +157,7 @@ func RunMacOSJob(ctx context.Context, o MacOSSubmitOptions) error {
 
 	remote.RunID = run.ID
 	remote.HTMLURL = run.HTMLURL
-	remote.ArtifactName = job.Request.Name + "-macOS"
+	remote.ArtifactName = job.Request.Name + spec.ArtifactSuffix
 	_ = o.Store.SaveRemote(o.JobID, remote)
 	o.log(fmt.Sprintf("已关联 run #%d %s", run.ID, run.HTMLURL))
 
@@ -199,7 +206,7 @@ func RunMacOSJob(ctx context.Context, o MacOSSubmitOptions) error {
 		if a.Expired {
 			continue
 		}
-		if strings.Contains(a.Name, job.Request.Name) || strings.HasSuffix(a.Name, "-macOS") {
+		if strings.Contains(a.Name, job.Request.Name) || strings.Contains(a.Name, o.JobID) || strings.HasSuffix(a.Name, spec.ArtifactSuffix) {
 			chosen = a
 			break
 		}
@@ -239,13 +246,40 @@ func RunMacOSJob(ctx context.Context, o MacOSSubmitOptions) error {
 	return nil
 }
 
-func fail(o MacOSSubmitOptions, err error) error {
+func fail(o CloudJobOptions, err error) error {
 	_ = o.Store.SaveStatus(o.JobID, common.Status{
 		State:   common.StateFailed,
 		Message: err.Error(),
 	})
 	o.log("✗ " + err.Error())
 	return err
+}
+
+type pakePlatformSpec struct {
+	Label          string
+	Workflow       string
+	IconPrefix     string
+	ArtifactSuffix string
+	DefaultTargets string
+}
+
+func specFor(p common.Platform) pakePlatformSpec {
+	if p == common.PlatformWindows {
+		return pakePlatformSpec{
+			Label:          "Windows",
+			Workflow:       "build-windows.yml",
+			IconPrefix:     "ci-assets/windows",
+			ArtifactSuffix: "-Windows",
+			DefaultTargets: "exe",
+		}
+	}
+	return pakePlatformSpec{
+		Label:          "macOS",
+		Workflow:       "build-macos.yml",
+		IconPrefix:     "ci-assets/macos",
+		ArtifactSuffix: "-macOS",
+		DefaultTargets: "dmg",
+	}
 }
 
 func itoaDefault(v, def int) string {

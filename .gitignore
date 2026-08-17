@@ -9,7 +9,9 @@ builds/*
 !builds/android/
 !builds/android/.gitkeep
 data/
+ci-assets/
 .DS_Store
 PakeGUI.exe
 PakeGUI-console.exe
 pake-gui.exe
+builds/

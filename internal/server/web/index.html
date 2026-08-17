@@ -196,7 +196,7 @@
               <div class="toggle-group">
                 <h3 class="toggle-group-title">界面</h3>
                 <div class="toggles">
-                  <label class="check"><input type="checkbox" name="androidFullscreen" id="android-fullscreen" /> 全屏（隐藏状态栏）</label>
+                  <label class="check"><input type="checkbox" name="androidFullscreen" id="android-fullscreen" /> 全屏（沉浸刘海，隐藏系统栏）</label>
                   <label class="check"><input type="checkbox" name="pullRefresh" id="android-pull-refresh" checked /> 下拉刷新</label>
                   <label class="check"><input type="checkbox" name="progressBar" id="android-progress-bar" checked /> 顶部加载进度条</label>
                 </div>
@@ -207,8 +207,9 @@
                   <label class="check"><input type="checkbox" name="enableFileUpload" id="android-file-upload" checked /> 允许选择文件</label>
                   <label class="check"><input type="checkbox" name="enableCamera" id="android-camera" /> 文件选择含相机</label>
                   <label class="check"><input type="checkbox" name="enableDownload" id="android-download" checked /> 下载到系统「下载」</label>
-                  <label class="check"><input type="checkbox" name="pushPlaceholder" id="android-push" /> 推送占位（PakeAndroid JS）</label>
+                  <label class="check"><input type="checkbox" name="pushPlaceholder" id="android-push" /> 本地通知 / 推送 API（PakeAndroid）</label>
                 </div>
+                <p class="field-hint">系统分享与刘海安全区 CSS 变量始终可用：<code>PakeAndroid.share()</code>、<code>--pake-safe-top</code> 等。</p>
               </div>
             </details>
 

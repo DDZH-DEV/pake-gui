@@ -15,7 +15,8 @@
 | 屏幕方向、全屏、下拉刷新、进度条 | 「打包 → Android 选项」 |
 | 外链策略 | 白名单 / 全部内开 / 全部外开 |
 | 选文件 / 相机 / 下载 | 可选开启 |
-| 推送占位 | 暴露 `PakeAndroid` JS 桩，未接 FCM |
+| 系统分享 / 刘海安全区 | 默认开启（`PakeAndroid` + CSS 变量） |
+| 本地通知 API | 可选；FCM 远端推送需自行接 Firebase |
 
 不上架流程、不提交 keystore 到仓库。安装 debug 包时系统会提示「未知来源」，属预期。
 
@@ -75,8 +76,33 @@
 
 - 返回键：先退 WebView 历史  
 - 白名单：启动域名 + Safe Domains；其它 http(s) 按外链策略处理  
+- **刘海 / 安全区**：非全屏自动避开状态栏与挖孔；全屏沉浸并向页面注入 `--pake-safe-top/bottom/left/right`（及 `viewport-fit=cover`）  
+- **下载**：优先 `Content-Disposition` / 查询参数文件名；避免把 `export.php` 存成脚本名；支持 `blob:` / `data:`  
+- **系统分享**：页面可调 `PakeAndroid.share(title, text, url)`  
+- **通知**：勾选「本地通知 / 推送 API」后可用 `requestPushPermission()` / `showNotification(title, body)`；FCM 远端推送需另接 `google-services.json`（见下）  
 - 注入：页面加载完成后执行 `assets/inject` 下的 `.js` / `.css`  
-- 推送占位：`window.PakeAndroid.isPushConfigured()` / `requestPushPermission()`  
+
+### H5 调用示例
+
+```js
+// 分享
+PakeAndroid.share("标题", "摘要", location.href);
+
+// 刘海安全区（px）
+const inset = JSON.parse(PakeAndroid.getSafeAreaInsets());
+// 或 CSS: padding-top: var(--pake-safe-top);
+
+// 本地通知（需打包时勾选推送能力）
+PakeAndroid.requestPushPermission();
+PakeAndroid.showNotification("新消息", "内容预览");
+```
+
+### 后续接入 FCM（可选）
+
+1. Firebase 控制台创建应用，下载 `google-services.json`  
+2. 放入 `android-shell/app/`，并在 Gradle 启用 Google Services 插件与 Messaging 依赖  
+3. 实现 `FirebaseMessagingService`，把 token 回写到 `PakeAndroid.getPushToken()`  
+4. 通知仍可复用现有 channel `pake_general`  
 
 旧目录本地手搓 SDK 方案已废弃；只保留云端 `android-shell/`。
 

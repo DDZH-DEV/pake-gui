@@ -1,33 +1,47 @@
 package com.pake.shell;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
+import android.content.ContentValues;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.MediaStore;
+import android.util.Base64;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.JavascriptInterface;
-import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -40,23 +54,26 @@ import java.util.Locale;
  */
 public class MainActivity extends Activity {
     private static final int REQ_FILE = 1001;
+    private static final int REQ_NOTIF = 1002;
 
     private WebView webView;
     private ProgressBar progressBar;
     private SwipeRefreshLayout swipe;
     private ValueCallback<Uri[]> filePathCallback;
     private Uri cameraOutputUri;
+    private int safeTopPx;
+    private int safeBottomPx;
+    private int safeLeftPx;
+    private int safeRightPx;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (BuildConfig.FULLSCREEN) {
-            getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        }
         setContentView(R.layout.activity_main);
         webView = findViewById(R.id.webview);
         progressBar = findViewById(R.id.progress);
         swipe = findViewById(R.id.swipe);
+        applyDisplayCutoutAndInsets();
         if (!BuildConfig.PULL_REFRESH) {
             swipe.setEnabled(false);
         } else {
@@ -65,8 +82,66 @@ public class MainActivity extends Activity {
         if (!BuildConfig.PROGRESS_BAR) {
             progressBar.setVisibility(View.GONE);
         }
+        if (BuildConfig.PUSH_PLACEHOLDER) {
+            AppNotifications.ensureChannel(this);
+        }
         configureWebView();
         webView.loadUrl(BuildConfig.START_URL);
+    }
+
+    private void applyDisplayCutoutAndInsets() {
+        View root = findViewById(R.id.root);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            WindowManager.LayoutParams lp = getWindow().getAttributes();
+            lp.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            getWindow().setAttributes(lp);
+        }
+
+        if (BuildConfig.FULLSCREEN) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+            WindowInsetsControllerCompat controller =
+                    WindowCompat.getInsetsController(getWindow(), root);
+            if (controller != null) {
+                controller.hide(WindowInsetsCompat.Type.statusBars()
+                        | WindowInsetsCompat.Type.navigationBars());
+                controller.setSystemBarsBehavior(
+                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            }
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            Insets bars = insets.getInsets(
+                    WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+            safeTopPx = bars.top;
+            safeBottomPx = bars.bottom;
+            safeLeftPx = bars.left;
+            safeRightPx = bars.right;
+            if (BuildConfig.FULLSCREEN) {
+                // Edge-to-edge: H5 uses CSS vars; keep a small top offset for the progress bar.
+                v.setPadding(0, 0, 0, 0);
+                updateProgressOffset(safeTopPx);
+            } else {
+                v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                updateProgressOffset(0);
+            }
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(root);
+    }
+
+    private void updateProgressOffset(int topPx) {
+        if (progressBar == null) {
+            return;
+        }
+        ViewGroup.LayoutParams lp = progressBar.getLayoutParams();
+        if (lp instanceof FrameLayout.LayoutParams) {
+            FrameLayout.LayoutParams flp = (FrameLayout.LayoutParams) lp;
+            flp.topMargin = Math.max(0, topPx);
+            progressBar.setLayoutParams(flp);
+        }
     }
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
@@ -96,8 +171,10 @@ public class MainActivity extends Activity {
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(webView, true);
 
-        if (BuildConfig.PUSH_PLACEHOLDER) {
-            webView.addJavascriptInterface(new PushBridge(), "PakeAndroid");
+        // Always expose native helpers (share / safe-area). Push APIs honor BuildConfig.
+        webView.addJavascriptInterface(new PakeBridge(), "PakeAndroid");
+        if (BuildConfig.ENABLE_DOWNLOAD) {
+            webView.addJavascriptInterface(new DownloadBridge(), "PakeDownload");
         }
 
         webView.setWebViewClient(new WebViewClient() {
@@ -117,6 +194,7 @@ public class MainActivity extends Activity {
                 if (swipe != null) {
                     swipe.setRefreshing(false);
                 }
+                injectSafeAreaCss();
                 injectAssets();
             }
         });
@@ -223,27 +301,178 @@ public class MainActivity extends Activity {
     }
 
     private void enqueueDownload(String url, String userAgent, String contentDisposition, String mimeType) {
+        if (url == null || url.isEmpty()) {
+            return;
+        }
+        if (url.startsWith("blob:")) {
+            saveBlobViaJs(url, mimeType, contentDisposition);
+            return;
+        }
+        if (url.startsWith("data:")) {
+            saveDataUrl(url, mimeType, contentDisposition);
+            return;
+        }
         try {
-            String name = URLUtil.guessFileName(url, contentDisposition, mimeType);
+            String name = DownloadNames.resolve(url, contentDisposition, mimeType);
+            File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            name = DownloadNames.uniqueIn(downloads, name);
+
             DownloadManager.Request req = new DownloadManager.Request(Uri.parse(url));
-            req.setMimeType(mimeType);
+            if (mimeType != null && !mimeType.trim().isEmpty()) {
+                req.setMimeType(mimeType);
+            }
             String cookie = CookieManager.getInstance().getCookie(url);
             if (cookie != null) {
-                req.addRequestHeader("cookie", cookie);
+                req.addRequestHeader("Cookie", cookie);
             }
             if (userAgent != null && !userAgent.isEmpty()) {
                 req.addRequestHeader("User-Agent", userAgent);
             }
+            req.addRequestHeader("Referer", webView != null ? webView.getUrl() : url);
             req.setTitle(name);
-            req.setDescription("下载中");
+            req.setDescription("正在保存到「下载」");
             req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
             req.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name);
             DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            if (dm == null) {
+                openExternal(Uri.parse(url));
+                return;
+            }
             dm.enqueue(req);
-            Toast.makeText(this, "开始下载: " + name, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "已开始下载\n" + name, Toast.LENGTH_LONG).show();
         } catch (Exception e) {
+            Toast.makeText(this, "下载失败，尝试用系统浏览器打开", Toast.LENGTH_SHORT).show();
             openExternal(Uri.parse(url));
         }
+    }
+
+    private void saveBlobViaJs(String blobUrl, String mimeType, String contentDisposition) {
+        String safeUrl = jsonString(blobUrl);
+        String safeMime = jsonString(mimeType == null ? "" : mimeType);
+        String safeCd = jsonString(contentDisposition == null ? "" : contentDisposition);
+        String js = "(function(){var u=" + safeUrl + ",m=" + safeMime + ",c=" + safeCd + ";"
+                + "fetch(u).then(function(r){return r.blob()}).then(function(b){"
+                + "var reader=new FileReader();"
+                + "reader.onloadend=function(){if(window.PakeDownload){"
+                + "PakeDownload.saveDataUrl(String(reader.result||''), m||b.type||'', c);"
+                + "}};"
+                + "reader.onerror=function(){if(window.PakeDownload){PakeDownload.fail('读取文件失败');}};"
+                + "reader.readAsDataURL(b);"
+                + "}).catch(function(e){if(window.PakeDownload){PakeDownload.fail(String(e&&e.message||e));}});"
+                + "})();";
+        webView.evaluateJavascript(js, null);
+        Toast.makeText(this, "正在准备下载…", Toast.LENGTH_SHORT).show();
+    }
+
+    private void saveDataUrl(String dataUrl, String mimeHint, String contentDisposition) {
+        try {
+            int comma = dataUrl.indexOf(',');
+            if (comma < 0) {
+                throw new IllegalArgumentException("bad data url");
+            }
+            String meta = dataUrl.substring(5, comma); // after "data:"
+            String payload = dataUrl.substring(comma + 1);
+            String mime = mimeHint;
+            if (mime == null || mime.trim().isEmpty()) {
+                int semi = meta.indexOf(';');
+                mime = semi >= 0 ? meta.substring(0, semi) : meta;
+            }
+            if (mime == null || mime.trim().isEmpty()) {
+                mime = "application/octet-stream";
+            }
+            byte[] bytes;
+            if (meta.toLowerCase(Locale.US).contains(";base64")) {
+                bytes = Base64.decode(payload, Base64.DEFAULT);
+            } else {
+                bytes = URLDecoderCompat.decode(payload).getBytes(StandardCharsets.UTF_8);
+            }
+            String name = DownloadNames.resolve("download", contentDisposition, mime);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.Downloads.DISPLAY_NAME, name);
+                values.put(MediaStore.Downloads.MIME_TYPE, mime);
+                values.put(MediaStore.Downloads.IS_PENDING, 1);
+                Uri collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI;
+                Uri item = getContentResolver().insert(collection, values);
+                if (item == null) {
+                    throw new IllegalStateException("MediaStore insert failed");
+                }
+                try (java.io.OutputStream os = getContentResolver().openOutputStream(item)) {
+                    if (os == null) {
+                        throw new IllegalStateException("openOutputStream failed");
+                    }
+                    os.write(bytes);
+                }
+                values.clear();
+                values.put(MediaStore.Downloads.IS_PENDING, 0);
+                getContentResolver().update(item, values, null, null);
+                Toast.makeText(this, "已保存到「下载」\n" + name, Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            File destDir = downloads;
+            if (destDir == null || (!destDir.exists() && !destDir.mkdirs())) {
+                destDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+            }
+            if (destDir == null) {
+                destDir = getFilesDir();
+            }
+            name = DownloadNames.uniqueIn(destDir, name);
+            File out = new File(destDir, name);
+            try (FileOutputStream fos = new FileOutputStream(out)) {
+                fos.write(bytes);
+            }
+            try {
+                Intent scan = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+                scan.setData(Uri.fromFile(out));
+                sendBroadcast(scan);
+            } catch (Exception ignored) {
+            }
+            Toast.makeText(this, "已保存到\n" + out.getAbsolutePath(), Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "保存失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private static String jsonString(String s) {
+        if (s == null) {
+            return "\"\"";
+        }
+        return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"")
+                .replace("\n", "\\n").replace("\r", "\\r") + "\"";
+    }
+
+    /** Minimal decode for data: URLs that are not base64. */
+    private static final class URLDecoderCompat {
+        static String decode(String s) {
+            try {
+                return java.net.URLDecoder.decode(s, "UTF-8");
+            } catch (Exception e) {
+                return s;
+            }
+        }
+    }
+
+    private void injectSafeAreaCss() {
+        if (webView == null) {
+            return;
+        }
+        String js = "(function(){"
+                + "var d=document.documentElement;"
+                + "d.style.setProperty('--pake-safe-top','" + safeTopPx + "px');"
+                + "d.style.setProperty('--pake-safe-bottom','" + safeBottomPx + "px');"
+                + "d.style.setProperty('--pake-safe-left','" + safeLeftPx + "px');"
+                + "d.style.setProperty('--pake-safe-right','" + safeRightPx + "px');"
+                + "var m=document.querySelector('meta[name=viewport]');"
+                + "if(!m){m=document.createElement('meta');m.name='viewport';"
+                + "m.content='width=device-width,initial-scale=1,viewport-fit=cover';"
+                + "document.head&&document.head.appendChild(m);}"
+                + "else if((m.content||'').indexOf('viewport-fit')<0){"
+                + "m.content=(m.content?m.content+',':'')+'viewport-fit=cover';}"
+                + "})();";
+        webView.evaluateJavascript(js, null);
     }
 
     private void injectAssets() {
@@ -385,17 +614,115 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 
-    /** Optional JS bridge stub for future FCM wiring. */
-    public class PushBridge {
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQ_NOTIF) {
+            return;
+        }
+        boolean ok = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        Toast.makeText(this, ok ? "已允许通知" : "未授予通知权限", Toast.LENGTH_SHORT).show();
+    }
+
+    /** Native helpers for H5: share, safe-area, optional local notify / FCM hooks. */
+    public class PakeBridge {
+        @JavascriptInterface
+        public void share(String title, String text, String url) {
+            runOnUiThread(() -> {
+                try {
+                    Intent send = new Intent(Intent.ACTION_SEND);
+                    send.setType("text/plain");
+                    StringBuilder body = new StringBuilder();
+                    if (text != null && !text.trim().isEmpty()) {
+                        body.append(text.trim());
+                    }
+                    if (url != null && !url.trim().isEmpty()) {
+                        if (body.length() > 0) {
+                            body.append('\n');
+                        }
+                        body.append(url.trim());
+                    }
+                    if (body.length() == 0 && webView != null && webView.getUrl() != null) {
+                        body.append(webView.getUrl());
+                    }
+                    send.putExtra(Intent.EXTRA_TEXT, body.toString());
+                    if (title != null && !title.trim().isEmpty()) {
+                        send.putExtra(Intent.EXTRA_SUBJECT, title.trim());
+                    }
+                    String chooserTitle = (title != null && !title.trim().isEmpty()) ? title.trim() : "分享";
+                    startActivity(Intent.createChooser(send, chooserTitle));
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, "无法打开分享", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public String getSafeAreaInsets() {
+            return "{\"top\":" + safeTopPx
+                    + ",\"bottom\":" + safeBottomPx
+                    + ",\"left\":" + safeLeftPx
+                    + ",\"right\":" + safeRightPx + "}";
+        }
+
         @JavascriptInterface
         public boolean isPushConfigured() {
-            return false;
+            // FCM token wiring is opt-in later; local notify channel is ready when enabled in GUI.
+            return BuildConfig.PUSH_PLACEHOLDER;
+        }
+
+        @JavascriptInterface
+        public String getPushToken() {
+            // Placeholder until google-services.json + FCM are wired in CI.
+            return "";
         }
 
         @JavascriptInterface
         public void requestPushPermission() {
+            runOnUiThread(() -> {
+                if (!BuildConfig.PUSH_PLACEHOLDER) {
+                    Toast.makeText(MainActivity.this, "未开启推送能力", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (Build.VERSION.SDK_INT >= 33) {
+                    if (ContextCompat.checkSelfPermission(MainActivity.this,
+                            Manifest.permission.POST_NOTIFICATIONS)
+                            == PackageManager.PERMISSION_GRANTED) {
+                        Toast.makeText(MainActivity.this, "通知权限已授予", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIF);
+                } else {
+                    Toast.makeText(MainActivity.this, "当前系统无需额外通知权限", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void showNotification(String title, String body) {
+            runOnUiThread(() -> {
+                if (!BuildConfig.PUSH_PLACEHOLDER) {
+                    Toast.makeText(MainActivity.this, "未开启推送能力", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                AppNotifications.show(MainActivity.this, title, body);
+            });
+        }
+    }
+
+    /** Handles blob:/data: downloads from the page context. */
+    public class DownloadBridge {
+        @JavascriptInterface
+        public void saveDataUrl(String dataUrl, String mimeType, String contentDisposition) {
+            runOnUiThread(() -> MainActivity.this.saveDataUrl(dataUrl, mimeType, contentDisposition));
+        }
+
+        @JavascriptInterface
+        public void fail(String message) {
             runOnUiThread(() ->
-                    Toast.makeText(MainActivity.this, "推送占位：尚未配置 FCM", Toast.LENGTH_SHORT).show());
+                    Toast.makeText(MainActivity.this,
+                            "下载失败: " + (message == null ? "" : message),
+                            Toast.LENGTH_SHORT).show());
         }
     }
 }

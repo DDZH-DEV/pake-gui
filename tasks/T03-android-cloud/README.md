@@ -20,7 +20,9 @@
 - [x] `.github/workflows/build-android.yml`（debug / release / aab）
 - [x] `specFor(android)` + `/api/cloud/jobs` 接通
 - [x] GUI：Android 选项 + 产物格式联动
-- [x] UA / 注入 / Safe Domains / 外链 / 文件相机下载 / 推送占位
+- [x] UA / 注入 / Safe Domains / 外链 / 文件相机下载 / 推送 API  
+- [x] 下载文件名优化（Disposition / 拒脚本名 / blob·data）  
+- [x] 刘海安全区 + 系统分享 + 本地通知通道  
 - [x] 文档 `docs/android.md`
 
 ## 非目标（本版）

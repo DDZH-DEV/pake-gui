@@ -10,7 +10,7 @@
 - `platform: "android"` → workflow `build-android.yml`
 - 通用模板：`android-shell/`（Gradle + WebView，占位符由 CI 注入）
 - 独立产物：`builds/android/`
-- 图标：`ci-assets/android/{jobId}/`
+- 图标：`ci-assets` 分支上的 `android/{jobId}/`（任务结束后清理）
 - 第一版只出 **debug 签名 APK**（可侧载）；不上架、不打 AAB、不提交 keystore
 
 ## Checklist

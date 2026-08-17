@@ -23,10 +23,15 @@ on:
         type: string
         default: ""
       icon:
-        description: "Icon URL or repo-relative path (.ico / .png). Empty = site icon"
+        description: "Icon URL or path on icon_branch (.ico / .png). Empty = site icon"
         required: false
         type: string
         default: ""
+      icon_branch:
+        description: "Branch holding ephemeral CI icons (default ci-assets)"
+        required: false
+        type: string
+        default: "ci-assets"
       width:
         description: "Window width (px)"
         required: false
@@ -71,6 +76,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Materialize icon from ci-assets branch
+        id: icon
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          OUT="$(bash .github/scripts/materialize-ci-asset.sh \
+            "${{ inputs.icon }}" \
+            "${{ inputs.icon_branch }}" \
+            ".ci-fetched/icon.bin")"
+          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+          echo "Resolved icon: ${OUT:-<none>}"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -122,8 +141,8 @@ jobs:
           if [ -n "${{ inputs.title }}" ]; then
             ARGS+=(--title "${{ inputs.title }}")
           fi
-          if [ -n "${{ inputs.icon }}" ]; then
-            ARGS+=(--icon "${{ inputs.icon }}")
+          if [ -n "${{ steps.icon.outputs.path }}" ]; then
+            ARGS+=(--icon "${{ steps.icon.outputs.path }}")
           fi
           if [ -n "${{ inputs.identifier }}" ]; then
             ARGS+=(--identifier "${{ inputs.identifier }}")

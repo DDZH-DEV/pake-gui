@@ -115,7 +115,8 @@ failed to run ...\light.exe
 
 - 本机：确认格式为 png/ico/icns/jpg/webp，≤ 8MB  
 - 云端：需有推送仓库内容的权限（OAuth `repo`）  
-- 私有仓：GUI 使用仓库内路径 `ci-assets/macos/...`，不要依赖 raw 公网 URL  
+- 私有仓：GUI 把本地图标上传到 **`ci-assets` 分支**（不写默认分支），workflow 再拉取；任务结束后自动清理  
+- 公网图标 URL 则直接传给构建，不上传仓库  
 
 ---
 

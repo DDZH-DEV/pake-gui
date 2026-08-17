@@ -71,11 +71,39 @@ func RunCloudJob(ctx context.Context, o CloudJobOptions) error {
 	remote.Workflow = workflow
 	remote.Ref = ref
 
+	assetsBranch := CIAssetsBranch
+	var uploaded []string
+	trackUpload := func(path string) {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			return
+		}
+		uploaded = append(uploaded, path)
+		remote.UploadedPaths = append([]string{}, uploaded...)
+		remote.IconBranch = assetsBranch
+		_ = o.Store.SaveRemote(o.JobID, remote)
+	}
+	defer func() {
+		if len(uploaded) == 0 {
+			return
+		}
+		cleanCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+		defer cancel()
+		o.log("清理 ci-assets 临时文件…")
+		for _, p := range uploaded {
+			if err := client.DeleteContent(cleanCtx, assetsBranch, p, "ci: cleanup "+o.JobID); err != nil {
+				o.log("清理失败 " + p + ": " + err.Error())
+			} else {
+				o.log("已删除 " + p)
+			}
+		}
+	}()
+
 	iconInput := ""
 	rawIcon := strings.TrimSpace(job.Request.Icon)
 	if rawIcon != "" && !strings.HasPrefix(strings.ToLower(rawIcon), "http://") &&
 		!strings.HasPrefix(strings.ToLower(rawIcon), "https://") {
-		// local file → copy into job dir → upload to repo (available after checkout)
+		// local file → upload to dedicated ci-assets branch (keeps default branch clean)
 		localIcon := rawIcon
 		data, err := os.ReadFile(localIcon)
 		if err != nil {
@@ -91,18 +119,22 @@ func RunCloudJob(ctx context.Context, o CloudJobOptions) error {
 			_ = fail(o, err)
 			return err
 		}
+		if err := client.EnsureBranch(ctx, assetsBranch, ref); err != nil {
+			_ = fail(o, fmt.Errorf("准备 %s 分支失败: %w", assetsBranch, err))
+			return err
+		}
 		remotePath := fmt.Sprintf("%s/%s/icon%s", spec.IconPrefix, o.JobID, ext)
-		o.log("上传图标到仓库: " + remotePath)
-		raw, err := client.UploadContent(ctx, ref, remotePath, data, "ci: upload icon for "+o.JobID)
+		o.log(fmt.Sprintf("上传图标到 %s 分支: %s", assetsBranch, remotePath))
+		raw, err := client.UploadContent(ctx, assetsBranch, remotePath, data, "ci(assets): upload icon for "+o.JobID)
 		if err != nil {
 			_ = fail(o, fmt.Errorf("上传图标失败: %w", err))
 			return err
 		}
-		// Prefer repo-relative path so private repos work after checkout.
 		iconInput = remotePath
 		remote.IconRemotePath = remotePath
 		remote.IconURL = raw
-		o.log("图标已提交，构建将使用路径: " + remotePath)
+		trackUpload(remotePath)
+		o.log("图标已上传（不污染默认分支），构建将从 ci-assets 拉取: " + remotePath)
 	} else if rawIcon != "" {
 		iconInput = rawIcon
 		remote.IconURL = rawIcon
@@ -113,13 +145,14 @@ func RunCloudJob(ctx context.Context, o CloudJobOptions) error {
 		"url":         job.Request.URL,
 		"name":        job.Request.Name,
 		"icon":        iconInput,
+		"icon_branch": assetsBranch,
 		"app_version": strDefault(job.Request.AppVersion, "1.0.0"),
 		"identifier":  job.Request.Identifier,
 		"job_id":      o.JobID,
 	}
 	switch platform {
 	case common.PlatformAndroid:
-		injectDir, err := o.uploadAndroidInject(ctx, client, ref, spec.IconPrefix)
+		injectDir, err := o.uploadAndroidInject(ctx, client, assetsBranch, ref, spec.IconPrefix, trackUpload)
 		if err != nil {
 			_ = fail(o, err)
 			return err
@@ -289,13 +322,21 @@ func fail(o CloudJobOptions, err error) error {
 	return err
 }
 
-func (o CloudJobOptions) uploadAndroidInject(ctx context.Context, client *Client, ref, iconPrefix string) (string, error) {
+func (o CloudJobOptions) uploadAndroidInject(
+	ctx context.Context,
+	client *Client,
+	assetsBranch, defaultRef, iconPrefix string,
+	track func(string),
+) (string, error) {
 	job, err := o.Store.Get(o.JobID)
 	if err != nil {
 		return "", err
 	}
 	if len(job.Request.Inject) == 0 {
 		return "", nil
+	}
+	if err := client.EnsureBranch(ctx, assetsBranch, defaultRef); err != nil {
+		return "", fmt.Errorf("准备 %s 分支失败: %w", assetsBranch, err)
 	}
 	remotePrefix := fmt.Sprintf("%s/%s/inject", iconPrefix, o.JobID)
 	localDir := filepath.Join(job.Dir, "inject")
@@ -323,9 +364,12 @@ func (o CloudJobOptions) uploadAndroidInject(ctx context.Context, client *Client
 			return "", err
 		}
 		remotePath := remotePrefix + "/" + base
-		o.log("上传注入脚本: " + remotePath)
-		if _, err := client.UploadContent(ctx, ref, remotePath, data, "ci: upload inject for "+o.JobID); err != nil {
+		o.log(fmt.Sprintf("上传注入脚本到 %s: %s", assetsBranch, remotePath))
+		if _, err := client.UploadContent(ctx, assetsBranch, remotePath, data, "ci(assets): upload inject for "+o.JobID); err != nil {
 			return "", fmt.Errorf("上传注入失败: %w", err)
+		}
+		if track != nil {
+			track(remotePath)
 		}
 		uploaded++
 	}
@@ -349,7 +393,7 @@ func specFor(p common.Platform) pakePlatformSpec {
 		return pakePlatformSpec{
 			Label:          "Windows",
 			Workflow:       "build-windows.yml",
-			IconPrefix:     "ci-assets/windows",
+			IconPrefix:     "windows",
 			ArtifactSuffix: "-Windows",
 			DefaultTargets: "exe",
 		}
@@ -357,7 +401,7 @@ func specFor(p common.Platform) pakePlatformSpec {
 		return pakePlatformSpec{
 			Label:          "Android",
 			Workflow:       "build-android.yml",
-			IconPrefix:     "ci-assets/android",
+			IconPrefix:     "android",
 			ArtifactSuffix: "-Android",
 			DefaultTargets: "apk",
 		}
@@ -365,7 +409,7 @@ func specFor(p common.Platform) pakePlatformSpec {
 		return pakePlatformSpec{
 			Label:          "macOS",
 			Workflow:       "build-macos.yml",
-			IconPrefix:     "ci-assets/macos",
+			IconPrefix:     "macos",
 			ArtifactSuffix: "-macOS",
 			DefaultTargets: "dmg",
 		}

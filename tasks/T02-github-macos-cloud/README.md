@@ -9,7 +9,7 @@ Windows GUI 选好参数 → 提交 GitHub Actions → 下载 DMG 到 `builds/ma
 - [x] 可在界面保存 GitHub 仓库与授权，并可「测试连接」  
 - [x] Device Flow 授权（Client ID）；PAT 作备用  
 - [x] 提交任务时创建独立目录 `data/cloud-jobs/{jobId}/`  
-- [x] 本地图标随任务上传到仓库 `ci-assets/macos/{jobId}/`  
+- [x] 本地图标随任务上传到 **`ci-assets` 分支** `macos/{jobId}/`（不污染默认分支，结束后清理）  
 - [x] 成功触发 `.github/workflows/build-macos.yml`  
 - [x] 可轮询状态；成功后 Artifact 落到 `builds/macos/`  
 - [x] 失败时界面可见原因（不泄露 Token）  

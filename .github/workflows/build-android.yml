@@ -18,10 +18,15 @@ on:
         required: true
         type: string
       icon:
-        description: "Icon URL or repo-relative path (.png / .ico / .jpg). Empty = default"
+        description: "Icon URL or path on icon_branch (.png / .ico / .jpg). Empty = default"
         required: false
         type: string
         default: ""
+      icon_branch:
+        description: "Branch holding ephemeral CI icons (default ci-assets)"
+        required: false
+        type: string
+        default: "ci-assets"
       app_version:
         description: "versionName"
         required: false
@@ -114,6 +119,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Materialize icon / inject from ci-assets branch
+        id: assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ICON_OUT="$(bash .github/scripts/materialize-ci-asset.sh \
+            "${{ inputs.icon }}" \
+            "${{ inputs.icon_branch }}" \
+            ".ci-fetched/icon.bin")"
+          INJECT_OUT="$(bash .github/scripts/materialize-ci-asset.sh \
+            "${{ inputs.inject_dir }}" \
+            "${{ inputs.icon_branch }}" \
+            ".ci-fetched/inject")"
+          echo "icon=$ICON_OUT" >> "$GITHUB_OUTPUT"
+          echo "inject_dir=$INJECT_OUT" >> "$GITHUB_OUTPUT"
+          echo "Resolved icon: ${ICON_OUT:-<none>}"
+          echo "Resolved inject: ${INJECT_OUT:-<none>}"
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -139,8 +164,8 @@ jobs:
         env:
           PAKE_START_URL: ${{ inputs.url }}
           PAKE_IDENTIFIER: ${{ inputs.identifier }}
-          PAKE_ICON: ${{ inputs.icon }}
-          PAKE_INJECT_DIR: ${{ inputs.inject_dir }}
+          PAKE_ICON: ${{ steps.assets.outputs.icon }}
+          PAKE_INJECT_DIR: ${{ steps.assets.outputs.inject_dir }}
           PAKE_ORIENTATION: ${{ inputs.orientation }}
         run: python3 android-shell/scripts/ci-prepare.py
 

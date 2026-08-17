@@ -8,7 +8,7 @@
 
 - [x] `.github/workflows/build-windows.yml`（`workflow_dispatch` + 自路径 push 注册）  
 - [x] 与 macOS 共用 Job / OAuth / 轮询 / 下载  
-- [x] 图标上传到 `ci-assets/windows/{jobId}/`  
+- [x] 图标上传到 `ci-assets` 分支 `windows/{jobId}/`（构建后清理）  
 - [x] GUI「云端目标」可选 Windows exe  
 - [x] 产物落到 `builds/windows/`  
 

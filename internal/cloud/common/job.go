@@ -57,13 +57,15 @@ type Request struct {
 
 // Remote is persisted as remote.json.
 type Remote struct {
-	RunID          int64  `json:"runId,omitempty"`
-	Workflow       string `json:"workflow,omitempty"`
-	Ref            string `json:"ref,omitempty"`
-	IconRemotePath string `json:"iconRemotePath,omitempty"`
-	IconURL        string `json:"iconUrl,omitempty"`
-	HTMLURL        string `json:"htmlUrl,omitempty"`
-	ArtifactName   string `json:"artifactName,omitempty"`
+	RunID          int64    `json:"runId,omitempty"`
+	Workflow       string   `json:"workflow,omitempty"`
+	Ref            string   `json:"ref,omitempty"`
+	IconBranch     string   `json:"iconBranch,omitempty"`
+	IconRemotePath string   `json:"iconRemotePath,omitempty"`
+	IconURL        string   `json:"iconUrl,omitempty"`
+	UploadedPaths  []string `json:"uploadedPaths,omitempty"`
+	HTMLURL        string   `json:"htmlUrl,omitempty"`
+	ArtifactName   string   `json:"artifactName,omitempty"`
 }
 
 // Status is persisted as status.json.

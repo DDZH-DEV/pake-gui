@@ -98,9 +98,9 @@ pake-gui/
 **图标建议**
 
 - 本地仍用现有上传控件
-- 提交云端时：**按 job 复制**，再上传到仓库路径：  
-  `ci-assets/macos/{jobId}/icon.png`  
-  （不要覆盖同一文件名，避免并发任务互相踩）
+- 提交云端时：**按 job 复制**，再上传到 **`ci-assets` 分支** 路径：  
+  `windows|macos|android/{jobId}/icon.png`  
+  （不再提交到默认分支；任务结束后 GUI 会删除临时文件）
 
 ### T03 — Android 云端（debug APK）
 
@@ -137,7 +137,7 @@ GET    /api/cloud/jobs/{id}/download  # 或直接打开 builds/{platform}/
 data/cloud-jobs/20260817-0031-a1b2/
   request.json      # url/name/icon/platform/...
   icon.png          # 本任务图标
-  remote.json       # { "runId": 123, "iconRemotePath": "ci-assets/macos/.../icon.png" }
+  remote.json       # { "runId": 123, "iconBranch": "ci-assets", "iconRemotePath": "macos/.../icon.png" }
   status.json       # { "state": "running", "updatedAt": "..." }
   logs.txt
 ```

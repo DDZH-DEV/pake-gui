@@ -151,10 +151,59 @@ func (c *Client) DefaultBranch(ctx context.Context) (string, error) {
 }
 
 type contentMeta struct {
-	SHA string `json:"sha"`
+	SHA     string `json:"sha"`
+	Type    string `json:"type"`
+	Path    string `json:"path"`
+	Name    string `json:"name"`
+	Content string `json:"content"` // base64 when file; empty for dir listing wrappers
 }
 
-// UploadContent creates or updates a file; returns raw.githubusercontent.com URL.
+// CIAssetsBranch holds ephemeral build icons/inject files so master stays clean.
+const CIAssetsBranch = "ci-assets"
+
+// EnsureBranch creates branch from fromBranch tip when missing.
+func (c *Client) EnsureBranch(ctx context.Context, branch, fromBranch string) error {
+	branch = strings.TrimSpace(branch)
+	fromBranch = strings.TrimSpace(fromBranch)
+	if branch == "" {
+		return fmt.Errorf("branch required")
+	}
+	if fromBranch == "" {
+		fromBranch = "master"
+	}
+	refPath := fmt.Sprintf("/repos/%s/%s/git/ref/heads/%s", c.Owner, c.Repo, url.PathEscape(branch))
+	if _, _, err := c.do(ctx, http.MethodGet, refPath, nil); err == nil {
+		return nil
+	}
+
+	fromPath := fmt.Sprintf("/repos/%s/%s/git/ref/heads/%s", c.Owner, c.Repo, url.PathEscape(fromBranch))
+	_, data, err := c.do(ctx, http.MethodGet, fromPath, nil)
+	if err != nil {
+		return fmt.Errorf("读取源分支 %s 失败: %w", fromBranch, err)
+	}
+	var ref struct {
+		Object struct {
+			SHA string `json:"sha"`
+		} `json:"object"`
+	}
+	if err := json.Unmarshal(data, &ref); err != nil || ref.Object.SHA == "" {
+		return fmt.Errorf("解析源分支 SHA 失败")
+	}
+	_, _, err = c.do(ctx, http.MethodPost, fmt.Sprintf("/repos/%s/%s/git/refs", c.Owner, c.Repo), map[string]any{
+		"ref": "refs/heads/" + branch,
+		"sha": ref.Object.SHA,
+	})
+	if err != nil {
+		// race: another job created it
+		if _, _, e2 := c.do(ctx, http.MethodGet, refPath, nil); e2 == nil {
+			return nil
+		}
+		return fmt.Errorf("创建分支 %s 失败: %w", branch, err)
+	}
+	return nil
+}
+
+// UploadContent creates or updates a file on ref; returns raw.githubusercontent.com URL.
 func (c *Client) UploadContent(ctx context.Context, ref, remotePath string, content []byte, message string) (rawURL string, err error) {
 	remotePath = strings.TrimPrefix(remotePath, "/")
 	apiPath := fmt.Sprintf("/repos/%s/%s/contents/%s", c.Owner, c.Repo, encodeContentPath(remotePath))
@@ -183,6 +232,60 @@ func (c *Client) UploadContent(ctx context.Context, ref, remotePath string, cont
 	rawURL = fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s",
 		c.Owner, c.Repo, ref, remotePath)
 	return rawURL, nil
+}
+
+// DeleteContent removes a file on ref. Missing files are ignored.
+func (c *Client) DeleteContent(ctx context.Context, ref, remotePath, message string) error {
+	remotePath = strings.TrimPrefix(remotePath, "/")
+	if remotePath == "" {
+		return nil
+	}
+	apiPath := fmt.Sprintf("/repos/%s/%s/contents/%s", c.Owner, c.Repo, encodeContentPath(remotePath))
+	q := apiPath + "?ref=" + url.QueryEscape(ref)
+	_, data, err := c.do(ctx, http.MethodGet, q, nil)
+	if err != nil {
+		if strings.Contains(err.Error(), "(404)") {
+			return nil
+		}
+		return err
+	}
+	var meta contentMeta
+	if err := json.Unmarshal(data, &meta); err != nil || meta.SHA == "" {
+		return fmt.Errorf("无法读取文件 sha: %s", remotePath)
+	}
+	body := map[string]any{
+		"message": message,
+		"sha":     meta.SHA,
+		"branch":  ref,
+	}
+	_, _, err = c.do(ctx, http.MethodDelete, apiPath, body)
+	return err
+}
+
+// ListContentPaths lists file paths under a directory on ref (non-recursive).
+func (c *Client) ListContentPaths(ctx context.Context, ref, dirPath string) ([]string, error) {
+	dirPath = strings.Trim(strings.TrimPrefix(dirPath, "/"), "/")
+	apiPath := fmt.Sprintf("/repos/%s/%s/contents/%s", c.Owner, c.Repo, encodeContentPath(dirPath))
+	q := apiPath + "?ref=" + url.QueryEscape(ref)
+	_, data, err := c.do(ctx, http.MethodGet, q, nil)
+	if err != nil {
+		return nil, err
+	}
+	var many []contentMeta
+	if err := json.Unmarshal(data, &many); err == nil {
+		out := make([]string, 0, len(many))
+		for _, m := range many {
+			if m.Type == "file" && m.Path != "" {
+				out = append(out, m.Path)
+			}
+		}
+		return out, nil
+	}
+	var one contentMeta
+	if err := json.Unmarshal(data, &one); err == nil && one.Type == "file" && one.Path != "" {
+		return []string{one.Path}, nil
+	}
+	return nil, fmt.Errorf("unexpected contents response for %s", dirPath)
 }
 
 func encodeContentPath(p string) string {

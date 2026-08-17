@@ -26,7 +26,7 @@
 ### 图标如何传到云端
 
 - 本地图标会先写入任务目录，再通过 Contents API 上传到：  
-  `ci-assets/macos/{jobId}/icon.*`  
+  `macos/{jobId}/icon.*`（位于 `ci-assets` 分支，不写默认分支）  
 - Actions `checkout` 后使用**仓库内相对路径**，私有仓库也可用  
 - 也可直接在「打包」里填 `https://…` 图标地址
 

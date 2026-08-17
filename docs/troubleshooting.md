@@ -126,7 +126,9 @@ failed to run ...\light.exe
 
 ## Android：安装 APK 提示未知来源 / 非正式签名
 
-第一版是 **debug 签名**，不能上架。在系统设置里允许该文件管理器「安装未知应用」后再打开 apk。
+debug 包是 **debug 签名**，不能上架。在系统设置里允许该文件管理器「安装未知应用」后再打开 apk。
+
+若选了 **apk-release / aab** 却构建失败，检查仓库是否配置了 `ANDROID_KEYSTORE_*` Secrets，见 [android.md](./android.md)。
 
 ---
 

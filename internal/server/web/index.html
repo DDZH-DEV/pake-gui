@@ -41,80 +41,112 @@
         <div class="tab-grid">
           <div class="panel form-panel">
             <div class="panel-head">
-              <h1>本机打包</h1>
-              <p>填写应用信息，在 Windows 上调用 <code>pake-cli</code> 生成安装包。</p>
+              <h1>打包参数</h1>
+              <p>先填<strong>基本信息</strong>（本机 / 云端 / Android 都用）。桌面窗口与行为在下方折叠区，仅本机 Windows 与云端 Win / macOS 会用到。</p>
             </div>
 
-            <div class="field-grid">
-              <label class="field span-2">
-                <span>网址 / 本地路径</span>
-                <input name="url" required placeholder="https://example.com 或 ./dist 或 ./index.html" />
-              </label>
-              <label class="field">
-                <span>应用名称</span>
-                <input name="name" required placeholder="MyApp（云端建议英文名）" />
-              </label>
-              <label class="field">
-                <span>版本号</span>
-                <input name="appVersion" placeholder="1.0.0" value="1.0.0" />
-              </label>
-              <label class="field">
-                <span>窗口宽度</span>
-                <input name="width" type="number" min="320" value="1200" />
-              </label>
-              <label class="field">
-                <span>窗口高度</span>
-                <input name="height" type="number" min="240" value="780" />
-              </label>
-
-              <div class="field span-2 icon-field">
-                <span>应用图标（可选）</span>
-                <div class="icon-picker">
-                  <div class="icon-preview" id="icon-preview" aria-hidden="true">
-                    <img id="icon-preview-img" alt="" hidden />
-                    <span id="icon-preview-placeholder">无</span>
-                  </div>
-                  <div class="icon-controls">
-                    <label class="btn ghost file-btn">
-                      选择图片
-                      <input type="file" id="icon-file" accept=".png,.ico,.icns,.jpg,.jpeg,.webp,image/png,image/x-icon,image/jpeg,image/webp" hidden />
-                    </label>
-                    <button type="button" class="btn ghost" id="btn-clear-icon">清除</button>
-                    <input name="icon" id="icon-path" placeholder="或粘贴 https://… / 本地路径" />
-                  </div>
-                </div>
-                <p class="field-hint" id="icon-hint">支持 png / ico / icns / jpg / webp，最大 8MB</p>
+            <div class="param-section">
+              <div class="param-section-head">
+                <h2>基本信息</h2>
+                <p>云端 Android 只读这一区；桌面打包也会用到。</p>
               </div>
-
-              <label class="field">
-                <span>窗口标题</span>
-                <input name="title" placeholder="默认使用应用名" />
-              </label>
-              <label class="field">
-                <span>初始缩放 %</span>
-                <input name="zoom" type="number" min="50" max="200" value="100" />
-              </label>
-              <label class="field span-2">
-                <span>输出目录（默认 builds；绝对路径需确认）</span>
-                <input name="outDir" id="out-dir" placeholder="默认 ./builds" />
-              </label>
+              <div class="field-grid">
+                <label class="field span-2">
+                  <span>网址 / 本地路径</span>
+                  <input name="url" required placeholder="https://example.com 或 ./dist 或 ./index.html" />
+                </label>
+                <label class="field">
+                  <span>应用名称</span>
+                  <input name="name" required placeholder="MyApp" />
+                </label>
+                <label class="field">
+                  <span>版本号</span>
+                  <input name="appVersion" placeholder="1.0.0" value="1.0.0" />
+                </label>
+                <label class="field span-2">
+                  <span>包名 / Bundle ID</span>
+                  <input name="identifier" placeholder="com.example.app" />
+                  <span class="field-hint">桌面 = Bundle ID；Android = applicationId。Android 留空则按网址域名生成。</span>
+                </label>
+                <div class="field span-2 icon-field">
+                  <span>应用图标（可选）</span>
+                  <div class="icon-picker">
+                    <div class="icon-preview" id="icon-preview" aria-hidden="true">
+                      <img id="icon-preview-img" alt="" hidden />
+                      <span id="icon-preview-placeholder">无</span>
+                    </div>
+                    <div class="icon-controls">
+                      <label class="btn ghost file-btn">
+                        选择图片
+                        <input type="file" id="icon-file" accept=".png,.ico,.icns,.jpg,.jpeg,.webp,image/png,image/x-icon,image/jpeg,image/webp" hidden />
+                      </label>
+                      <button type="button" class="btn ghost" id="btn-clear-icon">清除</button>
+                      <input name="icon" id="icon-path" placeholder="或粘贴 https://… / 本地路径" />
+                    </div>
+                  </div>
+                  <p class="field-hint" id="icon-hint">支持 png / ico / icns / jpg / webp，最大 8MB</p>
+                </div>
+              </div>
             </div>
 
-            <details class="advanced" open>
-              <summary>窗口与行为</summary>
-              <p class="field-hint toggle-note">勾选后会写入打包命令。分平台项在不支持的系统上通常被 Pake 忽略；打云端 macOS 时「仅 macOS」选项会生效。</p>
+            <details class="param-section advanced" id="section-desktop-window">
+              <summary>
+                <span class="summary-main">桌面窗口</span>
+                <span class="summary-sub">本机 Windows · 云端 Win / macOS</span>
+              </summary>
+              <p class="field-hint toggle-note">Android APK 忽略这一区。</p>
+              <div class="field-grid">
+                <label class="field">
+                  <span>窗口宽度</span>
+                  <input name="width" type="number" min="320" value="1200" />
+                </label>
+                <label class="field">
+                  <span>窗口高度</span>
+                  <input name="height" type="number" min="240" value="780" />
+                </label>
+                <label class="field">
+                  <span>窗口标题</span>
+                  <input name="title" placeholder="默认使用应用名" />
+                </label>
+                <label class="field">
+                  <span>初始缩放 %</span>
+                  <input name="zoom" type="number" min="50" max="200" value="100" />
+                </label>
+              </div>
+            </details>
+
+            <details class="param-section advanced" id="section-desktop-behavior">
+              <summary>
+                <span class="summary-main">桌面行为</span>
+                <span class="summary-sub">托盘 · 全屏 · 导航 · 构建方式</span>
+              </summary>
+              <p class="field-hint toggle-note">只给桌面 <code>pake-cli</code> 用；云端 Android 全部忽略。不支持的平台上通常会被 Pake 忽略。</p>
 
               <div class="toggle-group">
-                <h3 class="toggle-group-title">全平台 <span class="plat-tag all">Win · macOS · Linux</span></h3>
+                <h3 class="toggle-group-title">窗口启动</h3>
                 <div class="toggles">
                   <label class="check"><input type="checkbox" name="fullscreen" /> 全屏启动</label>
                   <label class="check"><input type="checkbox" name="maximize" /> 最大化启动</label>
                   <label class="check"><input type="checkbox" name="alwaysOnTop" /> 窗口置顶</label>
                   <label class="check"><input type="checkbox" name="darkMode" /> 深色模式</label>
+                  <label class="check"><input type="checkbox" name="hideWindowDecorations" /> 隐藏窗口装饰 <span class="opt-hint">Win / Linux</span></label>
+                  <label class="check"><input type="checkbox" name="hideTitleBar" /> 隐藏标题栏 <span class="opt-hint">macOS</span></label>
+                </div>
+              </div>
+
+              <div class="toggle-group">
+                <h3 class="toggle-group-title">托盘与多窗口</h3>
+                <div class="toggles">
                   <label class="check"><input type="checkbox" name="showSystemTray" /> 系统托盘</label>
                   <label class="check"><input type="checkbox" name="startToTray" /> 启动到托盘 <span class="opt-hint">需托盘</span></label>
                   <label class="check"><input type="checkbox" name="multiInstance" /> 允许多实例</label>
                   <label class="check"><input type="checkbox" name="multiWindow" /> 多窗口</label>
+                </div>
+              </div>
+
+              <div class="toggle-group">
+                <h3 class="toggle-group-title">页面能力</h3>
+                <div class="toggles">
                   <label class="check"><input type="checkbox" name="enableFind" /> 页内查找</label>
                   <label class="check"><input type="checkbox" name="enableDragDrop" /> 拖放文件</label>
                   <label class="check"><input type="checkbox" name="incognito" /> 无痕模式</label>
@@ -122,34 +154,74 @@
                   <label class="check"><input type="checkbox" name="forceInternalNavigation" /> 强制应用内导航</label>
                   <label class="check"><input type="checkbox" name="ignoreCertificateErrors" /> 忽略证书错误</label>
                   <label class="check"><input type="checkbox" name="useLocalFile" /> 本地文件模式</label>
+                </div>
+              </div>
+
+              <div class="toggle-group">
+                <h3 class="toggle-group-title">构建方式</h3>
+                <div class="toggles">
                   <label class="check"><input type="checkbox" name="debug" /> Debug 构建</label>
                   <label class="check"><input type="checkbox" name="keepBinary" /> 保留原始二进制</label>
                   <label class="check"><input type="checkbox" name="iterativeBuild" /> 快速迭代构建 <span class="opt-hint">不要安装包</span></label>
                 </div>
               </div>
+            </details>
 
+            <details class="param-section advanced" id="section-android-options">
+              <summary>
+                <span class="summary-main">Android 选项</span>
+                <span class="summary-sub">云端 APK / AAB · UA 与注入见本机高级</span>
+              </summary>
+              <p class="field-hint toggle-note">提交云端 Android 时生效。User-Agent、Safe Domains、注入 JS/CSS 复用下方「本机高级」里的同名字段。</p>
+              <div class="field-grid">
+                <label class="field">
+                  <span>屏幕方向</span>
+                  <select name="orientation" id="android-orientation">
+                    <option value="unspecified">自动</option>
+                    <option value="portrait">竖屏</option>
+                    <option value="landscape">横屏</option>
+                    <option value="sensor">跟随传感器</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>外链策略</span>
+                  <select name="linkPolicy" id="android-link-policy">
+                    <option value="allowlist">白名单内开（默认）</option>
+                    <option value="internal">全部应用内打开</option>
+                    <option value="external">全部系统浏览器打开</option>
+                  </select>
+                </label>
+              </div>
               <div class="toggle-group">
-                <h3 class="toggle-group-title">Windows / Linux <span class="plat-tag win">本机常用</span></h3>
+                <h3 class="toggle-group-title">界面</h3>
                 <div class="toggles">
-                  <label class="check"><input type="checkbox" name="hideWindowDecorations" /> 隐藏窗口装饰 <span class="opt-hint">无边框</span></label>
+                  <label class="check"><input type="checkbox" name="androidFullscreen" id="android-fullscreen" /> 全屏（隐藏状态栏）</label>
+                  <label class="check"><input type="checkbox" name="pullRefresh" id="android-pull-refresh" checked /> 下拉刷新</label>
+                  <label class="check"><input type="checkbox" name="progressBar" id="android-progress-bar" checked /> 顶部加载进度条</label>
                 </div>
               </div>
-
               <div class="toggle-group">
-                <h3 class="toggle-group-title">仅 macOS <span class="plat-tag mac">云端打包生效</span></h3>
+                <h3 class="toggle-group-title">能力</h3>
                 <div class="toggles">
-                  <label class="check"><input type="checkbox" name="hideTitleBar" /> 隐藏标题栏 <span class="opt-hint">沉浸式</span></label>
+                  <label class="check"><input type="checkbox" name="enableFileUpload" id="android-file-upload" checked /> 允许选择文件</label>
+                  <label class="check"><input type="checkbox" name="enableCamera" id="android-camera" /> 文件选择含相机</label>
+                  <label class="check"><input type="checkbox" name="enableDownload" id="android-download" checked /> 下载到系统「下载」</label>
+                  <label class="check"><input type="checkbox" name="pushPlaceholder" id="android-push" /> 推送占位（PakeAndroid JS）</label>
                 </div>
-                <p class="field-hint">本机在 Windows 上打包时勾选也会带上参数，但只在 macOS 产物上有效；提交云端 macOS 时会一并带上。</p>
               </div>
             </details>
 
-            <details class="advanced">
-              <summary>高级选项</summary>
+            <details class="param-section advanced" id="section-local-advanced">
+              <summary>
+                <span class="summary-main">本机高级</span>
+                <span class="summary-sub">输出目录 · 注入 · UA · 代理 · Targets</span>
+              </summary>
+              <p class="field-hint toggle-note">本机 Windows 打包会用到这些。其中 <strong>User-Agent / Safe Domains / 注入 JS·CSS</strong> 在云端 Android 也会带上。</p>
               <div class="field-grid">
-                <label class="field">
-                  <span>Bundle ID / Android 包名</span>
-                  <input name="identifier" placeholder="com.example.app" />
+                <label class="field span-2">
+                  <span>输出目录</span>
+                  <input name="outDir" id="out-dir" placeholder="默认 ./builds" />
+                  <span class="field-hint">绝对路径若不在 builds 内，提交时会要求确认。</span>
                 </label>
                 <label class="field">
                   <span>Targets（本机 Windows）</span>
@@ -159,7 +231,22 @@
                     <option value="arm64">Windows arm64</option>
                   </select>
                 </label>
-
+                <label class="field">
+                  <span>激活快捷键</span>
+                  <input name="activationShortcut" placeholder="CmdOrControl+Shift+P" />
+                </label>
+                <label class="field span-2">
+                  <span>Safe Domains（逗号分隔）</span>
+                  <input name="safeDomain" placeholder="okta.com,slack.com" />
+                </label>
+                <label class="field span-2">
+                  <span>User Agent</span>
+                  <input name="userAgent" placeholder="自定义 UA" />
+                </label>
+                <label class="field span-2">
+                  <span>代理 URL</span>
+                  <input name="proxyUrl" placeholder="http://127.0.0.1:7890" />
+                </label>
                 <div class="field span-2 inject-field">
                   <span>注入 JS / CSS</span>
                   <div class="inject-toolbar">
@@ -176,23 +263,6 @@
                   <input type="hidden" name="inject" id="inject-value" value="" />
                   <p class="field-hint" id="inject-hint">可将脚本放到程序目录 data/inject/ 下</p>
                 </div>
-
-                <label class="field span-2">
-                  <span>Safe Domains（逗号分隔）</span>
-                  <input name="safeDomain" placeholder="okta.com,slack.com" />
-                </label>
-                <label class="field span-2">
-                  <span>User Agent</span>
-                  <input name="userAgent" placeholder="自定义 UA" />
-                </label>
-                <label class="field">
-                  <span>激活快捷键</span>
-                  <input name="activationShortcut" placeholder="CmdOrControl+Shift+P" />
-                </label>
-                <label class="field">
-                  <span>代理 URL</span>
-                  <input name="proxyUrl" placeholder="http://127.0.0.1:7890" />
-                </label>
               </div>
             </details>
 
@@ -222,7 +292,7 @@
           <div class="panel form-panel">
             <div class="panel-head">
               <h1>云端 · Windows / macOS / Android</h1>
-              <p id="cloud-head-desc">已支持 <strong>Windows exe</strong>（免装 VS，不打 MSI）、<strong>macOS DMG</strong>、<strong>Android debug APK</strong>（可侧载，不上架）。参数来自「打包」页；仓库默认 <code>DDZH-DEV/pake-gui</code>。</p>
+              <p id="cloud-head-desc">已支持 <strong>Windows exe</strong>（免装 VS，不打 MSI）、<strong>macOS DMG</strong>、<strong>Android debug APK</strong>（可侧载，不上架）。应用信息来自「打包」页的<strong>基本信息</strong>；仓库默认 <code>DDZH-DEV/pake-gui</code>。</p>
             </div>
 
             <div class="oauth-bar">
@@ -277,12 +347,16 @@
                   <option value="dmg">dmg</option>
                   <option value="app">app</option>
                   <option value="exe">exe</option>
+                  <option value="apk">apk（debug）</option>
+                  <option value="apk-release">apk（release）</option>
+                  <option value="aab">aab</option>
+                  <option value="apk-release,aab">apk-release + aab</option>
                 </select>
                 <span class="field-hint" id="cloud-targets-hint" hidden>云端 Windows 固定只出 exe，不打 MSI</span>
               </label>
               <label class="check" id="cloud-multi-arch-field"><input type="checkbox" id="cloud-multi-arch" /> Universal（Intel+Apple，更慢）</label>
               <label class="check" id="cloud-new-window-field"><input type="checkbox" id="cloud-new-window" /> 允许站点开新窗口</label>
-              <p class="field-hint span-2" id="cloud-android-hint" hidden>云端 Android 使用仓库内 WebView 模板，出 debug 签名 APK（可侧载安装；不上架、不打 AAB）。包名优先用「打包」页 Identifier，否则按网址域名生成。</p>
+              <p class="field-hint span-2" id="cloud-android-hint" hidden>Android 选项在「打包 → Android 选项」；UA / 注入 / Safe Domains 在「本机高级」。release / aab 需仓库 Secrets：ANDROID_KEYSTORE_BASE64、ANDROID_KEYSTORE_PASSWORD、ANDROID_KEY_ALIAS、ANDROID_KEY_PASSWORD。</p>
             </div>
 
             <details class="advanced token-box">

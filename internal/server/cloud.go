@@ -203,18 +203,30 @@ func (s *Server) handleCloudJobs(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"ok": true, "jobs": items})
 	case http.MethodPost:
 		var body struct {
-			Platform     string `json:"platform"`
-			URL          string `json:"url"`
-			Name         string `json:"name"`
-			Icon         string `json:"icon"`
-			Width        int    `json:"width"`
-			Height       int    `json:"height"`
-			AppVersion   string `json:"appVersion"`
-			Identifier   string `json:"identifier"`
-			HideTitleBar bool   `json:"hideTitleBar"`
-			MultiArch    bool   `json:"multiArch"`
-			NewWindow    bool   `json:"newWindow"`
-			Targets      string `json:"targets"`
+			Platform         string   `json:"platform"`
+			URL              string   `json:"url"`
+			Name             string   `json:"name"`
+			Icon             string   `json:"icon"`
+			Width            int      `json:"width"`
+			Height           int      `json:"height"`
+			AppVersion       string   `json:"appVersion"`
+			Identifier       string   `json:"identifier"`
+			HideTitleBar     bool     `json:"hideTitleBar"`
+			MultiArch        bool     `json:"multiArch"`
+			NewWindow        bool     `json:"newWindow"`
+			Targets          string   `json:"targets"`
+			UserAgent        string   `json:"userAgent"`
+			SafeDomain       string   `json:"safeDomain"`
+			Inject           []string `json:"inject"`
+			Orientation      string   `json:"orientation"`
+			Fullscreen       bool     `json:"fullscreen"`
+			PullRefresh      *bool    `json:"pullRefresh"`
+			ProgressBar      *bool    `json:"progressBar"`
+			LinkPolicy       string   `json:"linkPolicy"`
+			EnableFileUpload *bool    `json:"enableFileUpload"`
+			EnableCamera     bool     `json:"enableCamera"`
+			EnableDownload   *bool    `json:"enableDownload"`
+			PushPlaceholder  bool     `json:"pushPlaceholder"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -239,19 +251,38 @@ func (s *Server) handleCloudJobs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		boolOr := func(p *bool, def bool) bool {
+			if p == nil {
+				return def
+			}
+			return *p
+		}
+
 		req := common.Request{
-			Platform:     platform,
-			URL:          strings.TrimSpace(body.URL),
-			Name:         strings.TrimSpace(body.Name),
-			Icon:         strings.TrimSpace(body.Icon),
-			Width:        body.Width,
-			Height:       body.Height,
-			AppVersion:   strings.TrimSpace(body.AppVersion),
-			Identifier:   strings.TrimSpace(body.Identifier),
-			HideTitleBar: body.HideTitleBar,
-			MultiArch:    body.MultiArch,
-			NewWindow:    body.NewWindow,
-			Targets:      strings.TrimSpace(body.Targets),
+			Platform:         platform,
+			URL:              strings.TrimSpace(body.URL),
+			Name:             strings.TrimSpace(body.Name),
+			Icon:             strings.TrimSpace(body.Icon),
+			Width:            body.Width,
+			Height:           body.Height,
+			AppVersion:       strings.TrimSpace(body.AppVersion),
+			Identifier:       strings.TrimSpace(body.Identifier),
+			HideTitleBar:     body.HideTitleBar,
+			MultiArch:        body.MultiArch,
+			NewWindow:        body.NewWindow,
+			Targets:          strings.TrimSpace(body.Targets),
+			UserAgent:        strings.TrimSpace(body.UserAgent),
+			SafeDomain:       strings.TrimSpace(body.SafeDomain),
+			Inject:           body.Inject,
+			Orientation:      strings.TrimSpace(body.Orientation),
+			Fullscreen:       body.Fullscreen,
+			PullRefresh:      boolOr(body.PullRefresh, true),
+			ProgressBar:      boolOr(body.ProgressBar, true),
+			LinkPolicy:       strings.TrimSpace(body.LinkPolicy),
+			EnableFileUpload: boolOr(body.EnableFileUpload, true),
+			EnableCamera:     body.EnableCamera,
+			EnableDownload:   boolOr(body.EnableDownload, true),
+			PushPlaceholder:  body.PushPlaceholder,
 		}
 		job, err := store.Create(req)
 		if err != nil {

@@ -289,13 +289,6 @@ input:focus,
   background: rgba(255, 255, 255, 0.45);
 }
 
-.advanced summary {
-  cursor: pointer;
-  font-weight: 700;
-  font-family: var(--font-display);
-  padding: 0.35rem 0;
-}
-
 .toggles {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -354,6 +347,91 @@ input:focus,
 .plat-tag.mac {
   background: rgba(154, 52, 18, 0.1);
   color: var(--warn);
+}
+
+.plat-tag.android {
+  background: rgba(21, 115, 71, 0.12);
+  color: var(--ok);
+}
+
+.param-section {
+  margin-top: 1rem;
+}
+
+.param-section.advanced {
+  margin-top: 0.85rem;
+}
+
+.param-section-head {
+  margin: 0.15rem 0 0.15rem;
+}
+
+.param-section-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.param-section-head p {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.param-section > .field-grid {
+  margin-top: 0.75rem;
+}
+
+.advanced summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-family: var(--font-display);
+  padding: 0.35rem 0;
+  list-style: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  text-align: left;
+}
+
+.advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced summary::before {
+  content: "▸";
+  flex: 0 0 auto;
+  width: 0.85rem;
+  color: var(--muted);
+  transition: transform 0.12s ease;
+}
+
+.advanced[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.summary-main {
+  flex: 0 0 auto;
+  font-size: 0.98rem;
+  text-align: left;
+}
+
+.summary-sub {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: left;
+}
+
+.field .field-hint {
+  margin: 0;
 }
 
 .opt-hint {

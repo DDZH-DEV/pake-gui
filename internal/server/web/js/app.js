@@ -151,6 +151,10 @@ function collectOptions() {
 function fillForm(opts, goTab) {
   if (!opts) return;
   for (const [key, value] of Object.entries(opts)) {
+    if (key === "platform" || (key === "fullscreen" && opts.platform === "android")) {
+      // android fullscreen maps to #android-fullscreen, not desktop checkbox
+      if (key === "fullscreen" || key === "platform") continue;
+    }
     const el = form.elements[key];
     if (!el) continue;
     if (el.type === "checkbox") {
@@ -176,9 +180,30 @@ function fillForm(opts, goTab) {
   const targets = document.getElementById("cloud-targets");
   if (targets && opts.targets) {
     const t = String(opts.targets).toLowerCase();
-    if (t === "app" || t === "dmg" || t === "exe") targets.value = t;
+    if (["app", "dmg", "exe", "apk", "apk-release", "aab", "apk-release,aab", "aab,apk-release"].includes(t)) {
+      targets.value = t;
+    }
+  }
+  // Android-specific form fields
+  const orient = document.getElementById("android-orientation");
+  if (orient && opts.orientation) orient.value = opts.orientation;
+  const linkPol = document.getElementById("android-link-policy");
+  if (linkPol && opts.linkPolicy) linkPol.value = opts.linkPolicy;
+  const setChk = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && val != null) el.checked = Boolean(val);
+  };
+  if (opts.platform === "android" || opts.orientation || opts.linkPolicy) {
+    setChk("android-fullscreen", opts.fullscreen);
+    if (opts.pullRefresh != null) setChk("android-pull-refresh", opts.pullRefresh);
+    if (opts.progressBar != null) setChk("android-progress-bar", opts.progressBar);
+    if (opts.enableFileUpload != null) setChk("android-file-upload", opts.enableFileUpload);
+    setChk("android-camera", opts.enableCamera);
+    if (opts.enableDownload != null) setChk("android-download", opts.enableDownload);
+    setChk("android-push", opts.pushPlaceholder);
   }
   syncCloudPlatformUI();
+  expandParamSectionsFor(opts);
 
   const icon = (opts.icon || "").trim();
   if (/^https?:\/\//i.test(icon)) {
@@ -202,6 +227,83 @@ function fillForm(opts, goTab) {
       ? `已回填「${label}」→ 云端 Tab，可直接提交`
       : `已回填「${label}」→ 打包 Tab（也可再切到「云端」提交）`
   );
+}
+
+function expandParamSectionsFor(opts) {
+  if (!opts) return;
+  const desktopKeys = [
+    "title",
+    "width",
+    "height",
+    "zoom",
+    "hideTitleBar",
+    "hideWindowDecorations",
+    "fullscreen",
+    "maximize",
+    "alwaysOnTop",
+    "darkMode",
+    "showSystemTray",
+    "startToTray",
+    "multiInstance",
+    "multiWindow",
+    "enableFind",
+    "enableDragDrop",
+    "incognito",
+    "wasm",
+    "forceInternalNavigation",
+    "ignoreCertificateErrors",
+    "useLocalFile",
+    "debug",
+    "keepBinary",
+    "iterativeBuild",
+  ];
+  const advancedKeys = [
+    "outDir",
+    "targets",
+    "userAgent",
+    "activationShortcut",
+    "safeDomain",
+    "proxyUrl",
+  ];
+  const androidKeys = [
+    "orientation",
+    "linkPolicy",
+    "enableCamera",
+    "pushPlaceholder",
+  ];
+  const hasDesktop = desktopKeys.some((k) => {
+    const v = opts[k];
+    if (typeof v === "boolean") return v;
+    if (typeof v === "number") {
+      if (k === "width") return v > 0 && v !== 1200;
+      if (k === "height") return v > 0 && v !== 780;
+      if (k === "zoom") return v > 0 && v !== 100;
+      return v > 0;
+    }
+    return String(v || "").trim() !== "";
+  });
+  const hasAdvanced =
+    advancedKeys.some((k) => String(opts[k] || "").trim() !== "") ||
+    (Array.isArray(opts.inject) && opts.inject.length > 0);
+  const hasAndroid =
+    opts.platform === "android" ||
+    androidKeys.some((k) => {
+      const v = opts[k];
+      if (typeof v === "boolean") return v;
+      return String(v || "").trim() !== "" && String(v) !== "unspecified" && String(v) !== "allowlist";
+    }) ||
+    opts.fullscreen === true;
+
+  const win = document.getElementById("section-desktop-window");
+  const behavior = document.getElementById("section-desktop-behavior");
+  const advanced = document.getElementById("section-local-advanced");
+  const androidSec = document.getElementById("section-android-options");
+  if (hasDesktop) {
+    if (win) win.open = true;
+    if (behavior) behavior.open = true;
+  }
+  if (hasAdvanced && advanced) advanced.open = true;
+  if (hasAndroid && androidSec) androidSec.open = true;
 }
 
 async function refreshEnv() {
@@ -983,6 +1085,18 @@ async function refreshCloudJobs() {
               newWindow: req.newWindow,
               targets: req.targets,
               platform: plat,
+              userAgent: req.userAgent,
+              safeDomain: req.safeDomain,
+              inject: req.inject,
+              orientation: req.orientation,
+              linkPolicy: req.linkPolicy,
+              fullscreen: req.fullscreen,
+              pullRefresh: req.pullRefresh,
+              progressBar: req.progressBar,
+              enableFileUpload: req.enableFileUpload,
+              enableCamera: req.enableCamera,
+              enableDownload: req.enableDownload,
+              pushPlaceholder: req.pushPlaceholder,
             },
             "cloud"
           );
@@ -1061,8 +1175,28 @@ async function submitCloudMacOS() {
     hideTitleBar: opts.hideTitleBar,
     multiArch: isWin || isAndroid ? false : document.getElementById("cloud-multi-arch")?.checked === true,
     newWindow: isAndroid ? false : document.getElementById("cloud-new-window")?.checked === true,
-    targets: isAndroid ? "apk" : isWin ? "exe" : document.getElementById("cloud-targets")?.value || "dmg",
+    targets: isAndroid
+      ? document.getElementById("cloud-targets")?.value || "apk"
+      : isWin
+        ? "exe"
+        : document.getElementById("cloud-targets")?.value || "dmg",
   };
+  if (isAndroid) {
+    Object.assign(body, {
+      userAgent: opts.userAgent || "",
+      safeDomain: opts.safeDomain || "",
+      inject: opts.inject || [],
+      orientation: document.getElementById("android-orientation")?.value || "unspecified",
+      linkPolicy: document.getElementById("android-link-policy")?.value || "allowlist",
+      fullscreen: document.getElementById("android-fullscreen")?.checked === true,
+      pullRefresh: document.getElementById("android-pull-refresh")?.checked !== false,
+      progressBar: document.getElementById("android-progress-bar")?.checked !== false,
+      enableFileUpload: document.getElementById("android-file-upload")?.checked !== false,
+      enableCamera: document.getElementById("android-camera")?.checked === true,
+      enableDownload: document.getElementById("android-download")?.checked !== false,
+      pushPlaceholder: document.getElementById("android-push")?.checked === true,
+    });
+  }
 
   const label = isAndroid ? "Android APK" : isWin ? "Windows exe" : "macOS";
   const outHint = isAndroid ? "builds/android" : isWin ? "builds/windows" : "builds/macos";
@@ -1095,23 +1229,41 @@ function syncCloudPlatformUI() {
   const multi = document.getElementById("cloud-multi-arch-field");
   const hint = document.getElementById("cloud-targets-hint");
   const targets = document.getElementById("cloud-targets");
-  const targetsField = document.getElementById("cloud-targets-field");
   const newWin = document.getElementById("cloud-new-window-field");
   const androidHint = document.getElementById("cloud-android-hint");
   const btn = document.getElementById("btn-cloud-submit");
   if (multi) multi.hidden = isWin || isAndroid;
-  if (targetsField) targetsField.hidden = isAndroid;
   if (newWin) newWin.hidden = isAndroid;
   if (androidHint) androidHint.hidden = !isAndroid;
-  if (hint) hint.hidden = !isWin;
+  if (hint) {
+    hint.hidden = !(isWin || isAndroid);
+    if (isAndroid) {
+      hint.textContent =
+        "apk=debug 可侧载；apk-release / aab 需仓库配置 keystore Secrets";
+    } else if (isWin) {
+      hint.textContent = "云端 Windows 固定只出 exe，不打 MSI";
+    }
+  }
   if (targets) {
     targets.disabled = isWin;
     for (const opt of targets.options) {
-      if (opt.value === "exe") opt.hidden = !isWin;
-      if (opt.value === "dmg" || opt.value === "app") opt.hidden = isWin;
+      const v = opt.value;
+      if (v === "exe") opt.hidden = !isWin;
+      if (v === "dmg" || v === "app") opt.hidden = isWin || isAndroid;
+      if (v === "apk" || v === "apk-release" || v === "aab" || v === "apk-release,aab") {
+        opt.hidden = !isAndroid;
+      }
     }
-    if (isWin) targets.value = "exe";
-    else if (targets.value === "exe") targets.value = "dmg";
+    if (isAndroid) {
+      const cur = targets.value;
+      if (!["apk", "apk-release", "aab", "apk-release,aab"].includes(cur)) {
+        targets.value = "apk";
+      }
+    } else if (isWin) {
+      targets.value = "exe";
+    } else if (["exe", "apk", "apk-release", "aab", "apk-release,aab"].includes(targets.value)) {
+      targets.value = "dmg";
+    }
   }
   if (btn) {
     if (isAndroid) btn.textContent = "提交 Android 云端（APK）";

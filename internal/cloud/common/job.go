@@ -37,6 +37,22 @@ type Request struct {
 	NewWindow    bool     `json:"newWindow,omitempty"`
 	Targets      string   `json:"targets,omitempty"`
 	Platform     Platform `json:"platform"`
+
+	// Shared extras (desktop local + Android cloud).
+	UserAgent  string   `json:"userAgent,omitempty"`
+	SafeDomain string   `json:"safeDomain,omitempty"`
+	Inject     []string `json:"inject,omitempty"`
+
+	// Android cloud options.
+	Orientation      string `json:"orientation,omitempty"` // unspecified|portrait|landscape|sensor
+	Fullscreen       bool   `json:"fullscreen,omitempty"`
+	PullRefresh      bool   `json:"pullRefresh,omitempty"`
+	ProgressBar      bool   `json:"progressBar,omitempty"`
+	LinkPolicy       string `json:"linkPolicy,omitempty"` // allowlist|internal|external
+	EnableFileUpload bool   `json:"enableFileUpload,omitempty"`
+	EnableCamera     bool   `json:"enableCamera,omitempty"`
+	EnableDownload   bool   `json:"enableDownload,omitempty"`
+	PushPlaceholder  bool   `json:"pushPlaceholder,omitempty"`
 }
 
 // Remote is persisted as remote.json.

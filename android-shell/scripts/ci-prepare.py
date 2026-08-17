@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare android-shell for CI: applicationId, cleartext flag, optional icon."""
+"""Prepare android-shell for CI: applicationId, cleartext, icon, inject assets."""
 from __future__ import annotations
 
 import os
@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 APP_RES = ROOT / "app" / "src" / "main" / "res"
+INJECT_DEST = ROOT / "app" / "src" / "main" / "assets" / "inject"
 
 
 def valid_app_id(value: str) -> bool:
@@ -46,15 +47,33 @@ def resolve_app_id(identifier: str, url: str) -> str:
     return app_id_from_url(url)
 
 
-def write_output(app_id: str, cleartext: str) -> None:
+def normalize_orientation(raw: str) -> str:
+    v = (raw or "").strip().lower()
+    mapping = {
+        "": "unspecified",
+        "auto": "unspecified",
+        "unspecified": "unspecified",
+        "sensor": "sensor",
+        "portrait": "portrait",
+        "landscape": "landscape",
+    }
+    return mapping.get(v, "unspecified")
+
+
+def write_output(app_id: str, cleartext: str, orientation: str) -> None:
     dest = os.environ.get("GITHUB_OUTPUT")
+    lines = [
+        f"app_id={app_id}",
+        f"cleartext={cleartext}",
+        f"orientation={orientation}",
+    ]
     if not dest:
-        print(f"app_id={app_id}")
-        print(f"cleartext={cleartext}")
+        for line in lines:
+            print(line)
         return
     with open(dest, "a", encoding="utf-8") as fh:
-        fh.write(f"app_id={app_id}\n")
-        fh.write(f"cleartext={cleartext}\n")
+        for line in lines:
+            fh.write(line + "\n")
 
 
 def fetch_icon(src: str, dest: Path) -> bool:
@@ -122,19 +141,56 @@ def apply_icon(src: str) -> None:
     print(f"installed launcher icon: {dest}")
 
 
+def apply_inject(src_dir: str) -> None:
+    INJECT_DEST.mkdir(parents=True, exist_ok=True)
+    # Keep .gitkeep; remove previous inject payloads.
+    for child in INJECT_DEST.iterdir():
+        if child.name == ".gitkeep":
+            continue
+        if child.is_file():
+            child.unlink(missing_ok=True)
+    src = (src_dir or "").strip()
+    if not src:
+        print("no inject dir")
+        return
+    root = Path(src)
+    if not root.is_dir():
+        # maybe repo-relative
+        alt = Path.cwd() / src
+        if alt.is_dir():
+            root = alt
+        else:
+            print(f"inject dir missing: {src}", file=sys.stderr)
+            return
+    count = 0
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        if path.suffix.lower() not in {".js", ".css"}:
+            continue
+        dest = INJECT_DEST / path.name
+        shutil.copyfile(path, dest)
+        count += 1
+        print(f"inject: {dest.name}")
+    print(f"inject files: {count}")
+
+
 def main() -> int:
     url = os.environ.get("PAKE_START_URL", "").strip()
     identifier = os.environ.get("PAKE_IDENTIFIER", "").strip()
     icon = os.environ.get("PAKE_ICON", "").strip()
+    inject_dir = os.environ.get("PAKE_INJECT_DIR", "").strip()
+    orientation = normalize_orientation(os.environ.get("PAKE_ORIENTATION", ""))
     if not url:
         print("PAKE_START_URL is required", file=sys.stderr)
         return 1
     app_id = resolve_app_id(identifier, url)
     scheme = (urlparse(url).scheme or "").lower()
     cleartext = "true" if scheme == "http" else "false"
-    print(f"applicationId={app_id} cleartext={cleartext}")
-    write_output(app_id, cleartext)
+    print(f"applicationId={app_id} cleartext={cleartext} orientation={orientation}")
+    write_output(app_id, cleartext, orientation)
     apply_icon(icon)
+    apply_inject(inject_dir)
     return 0
 
 

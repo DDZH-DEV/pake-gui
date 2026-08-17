@@ -1,10 +1,8 @@
-# Build a debug-signed APK from android-shell (generic WebView wrapper).
-# First version: sideload only. No Play Store / AAB / release keystore.
+# Build Android APK / AAB from android-shell (generic WebView wrapper).
+# Debug APK always works. Release APK / AAB need GitHub Secrets (keystore).
 name: Build Android APK (WebView)
 
 on:
-  # Self-path push registers the workflow so GUI/API dispatch is not 404.
-  # The job itself only runs on workflow_dispatch.
   push:
     paths:
       - ".github/workflows/build-android.yml"
@@ -39,13 +37,78 @@ on:
         required: false
         type: string
         default: ""
+      targets:
+        description: "apk | apk-release | aab | apk-release,aab"
+        required: false
+        type: string
+        default: "apk"
+      user_agent:
+        description: "Custom User-Agent (empty = WebView default)"
+        required: false
+        type: string
+        default: ""
+      safe_domains:
+        description: "Extra allowed domains, comma-separated"
+        required: false
+        type: string
+        default: ""
+      inject_dir:
+        description: "Repo-relative dir with .js/.css to inject"
+        required: false
+        type: string
+        default: ""
+      orientation:
+        description: "unspecified | portrait | landscape | sensor"
+        required: false
+        type: string
+        default: "unspecified"
+      link_policy:
+        description: "allowlist | internal | external"
+        required: false
+        type: string
+        default: "allowlist"
+      fullscreen:
+        description: "Hide status bar"
+        required: false
+        type: boolean
+        default: false
+      pull_refresh:
+        description: "Pull to refresh"
+        required: false
+        type: boolean
+        default: true
+      progress_bar:
+        description: "Top loading progress bar"
+        required: false
+        type: boolean
+        default: true
+      file_upload:
+        description: "Allow <input type=file>"
+        required: false
+        type: boolean
+        default: true
+      camera:
+        description: "Allow camera in file chooser"
+        required: false
+        type: boolean
+        default: false
+      download:
+        description: "Save downloads via DownloadManager"
+        required: false
+        type: boolean
+        default: true
+      push_placeholder:
+        description: "Expose PakeAndroid JS stub for future FCM"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build-android:
-    name: Android debug APK
+    name: Android package
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
 
     steps:
       - name: Checkout
@@ -71,15 +134,44 @@ jobs:
         if: ${{ inputs.icon != '' }}
         run: sudo apt-get update && sudo apt-get install -y imagemagick
 
-      - name: Prepare template (app id / icon)
+      - name: Prepare template (app id / icon / inject)
         id: prep
         env:
           PAKE_START_URL: ${{ inputs.url }}
           PAKE_IDENTIFIER: ${{ inputs.identifier }}
           PAKE_ICON: ${{ inputs.icon }}
+          PAKE_INJECT_DIR: ${{ inputs.inject_dir }}
+          PAKE_ORIENTATION: ${{ inputs.orientation }}
         run: python3 android-shell/scripts/ci-prepare.py
 
-      - name: Assemble debug APK
+      - name: Decode release keystore (optional)
+        id: keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          TARGETS="${{ inputs.targets }}"
+          NEED_RELEASE=0
+          case "$TARGETS" in
+            *release*|*aab*) NEED_RELEASE=1 ;;
+          esac
+          if [ "$NEED_RELEASE" = "0" ]; then
+            echo "need_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ] || [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ] \
+            || [ -z "${ANDROID_KEY_ALIAS:-}" ] || [ -z "${ANDROID_KEY_PASSWORD:-}" ]; then
+            echo "Release/AAB requires secrets: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD"
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android-shell/release.keystore
+          echo "need_release=true" >> "$GITHUB_OUTPUT"
+          echo "store_file=$GITHUB_WORKSPACE/android-shell/release.keystore" >> "$GITHUB_OUTPUT"
+
+      - name: Assemble packages
         working-directory: android-shell
         env:
           PAKE_START_URL: ${{ inputs.url }}
@@ -87,25 +179,75 @@ jobs:
           PAKE_APP_ID: ${{ steps.prep.outputs.app_id }}
           PAKE_APP_VERSION: ${{ inputs.app_version }}
           PAKE_CLEARTEXT: ${{ steps.prep.outputs.cleartext }}
-        run: gradle assembleDebug --no-daemon --stacktrace
+          PAKE_ORIENTATION: ${{ steps.prep.outputs.orientation }}
+          PAKE_USER_AGENT: ${{ inputs.user_agent }}
+          PAKE_SAFE_DOMAINS: ${{ inputs.safe_domains }}
+          PAKE_LINK_POLICY: ${{ inputs.link_policy }}
+          PAKE_FULLSCREEN: ${{ inputs.fullscreen }}
+          PAKE_PULL_REFRESH: ${{ inputs.pull_refresh }}
+          PAKE_PROGRESS_BAR: ${{ inputs.progress_bar }}
+          PAKE_FILE_UPLOAD: ${{ inputs.file_upload }}
+          PAKE_CAMERA: ${{ inputs.camera }}
+          PAKE_DOWNLOAD: ${{ inputs.download }}
+          PAKE_PUSH_PLACEHOLDER: ${{ inputs.push_placeholder }}
+          PAKE_STORE_FILE: ${{ steps.keystore.outputs.store_file }}
+          PAKE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          PAKE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          PAKE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          TARGETS="$(echo '${{ inputs.targets }}' | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+          case "$TARGETS" in
+            ""|apk)
+              TASKS=(assembleDebug)
+              ;;
+            apk-release)
+              TASKS=(assembleRelease)
+              ;;
+            aab)
+              TASKS=(bundleRelease)
+              ;;
+            apk-release,aab|aab,apk-release)
+              TASKS=(assembleRelease bundleRelease)
+              ;;
+            apk,aab|aab,apk)
+              TASKS=(assembleDebug bundleRelease)
+              ;;
+            *)
+              echo "Unknown targets: $TARGETS (use apk | apk-release | aab | apk-release,aab)"
+              exit 1
+              ;;
+          esac
+          echo "Gradle tasks: ${TASKS[*]}"
+          gradle "${TASKS[@]}" --no-daemon --stacktrace
 
-      - name: Collect APK
+      - name: Collect artifacts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist-android
-          SRC="android-shell/app/build/outputs/apk/debug/app-debug.apk"
-          if [ ! -f "$SRC" ]; then
-            echo "debug APK not found"
+          JOB="${{ inputs.job_id }}"
+          if [ -z "$JOB" ]; then JOB="app"; fi
+          found=0
+          shopt -s nullglob
+          for f in android-shell/app/build/outputs/apk/debug/*.apk; do
+            cp -f "$f" "dist-android/${JOB}-debug.apk"
+            found=1
+          done
+          for f in android-shell/app/build/outputs/apk/release/*.apk; do
+            cp -f "$f" "dist-android/${JOB}-release.apk"
+            found=1
+          done
+          for f in android-shell/app/build/outputs/bundle/release/*.aab; do
+            cp -f "$f" "dist-android/${JOB}-release.aab"
+            found=1
+          done
+          ls -la dist-android || true
+          if [ "$found" = "0" ]; then
+            echo "No APK/AAB found"
             find android-shell/app/build/outputs -type f || true
             exit 1
           fi
-          JOB="${{ inputs.job_id }}"
-          if [ -z "$JOB" ]; then
-            JOB="app"
-          fi
-          cp -f "$SRC" "dist-android/${JOB}-debug.apk"
-          ls -la dist-android
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@v4

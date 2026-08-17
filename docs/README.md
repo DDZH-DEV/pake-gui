@@ -20,7 +20,7 @@
 |------|------|-----|----------|------|
 | Windows | 本机 `pake-cli` 或 GitHub Actions（仅 exe） | 「打包」/「云端」Tab | `builds/windows/` | 可用 |
 | macOS | GitHub Actions | 「云端」Tab | `builds/macos/` | 可用（需推仓 + OAuth） |
-| Android | GitHub Actions（`android-shell` WebView） | 「云端」Tab | `builds/android/` | 可用（debug APK，可侧载） |
+| Android | GitHub Actions（`android-shell` WebView） | 「云端」Tab | `builds/android/` | 可用（debug / release APK、AAB） |
 
 ## 相关目录
 

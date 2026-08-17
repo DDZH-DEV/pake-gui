@@ -118,7 +118,24 @@ func RunCloudJob(ctx context.Context, o CloudJobOptions) error {
 	}
 	switch platform {
 	case common.PlatformAndroid:
-		// url / name / icon / app_version / identifier / job_id only
+		injectDir, err := o.uploadAndroidInject(ctx, client, ref, spec.IconPrefix)
+		if err != nil {
+			_ = fail(o, err)
+			return err
+		}
+		inputs["targets"] = strDefault(job.Request.Targets, spec.DefaultTargets)
+		inputs["user_agent"] = job.Request.UserAgent
+		inputs["safe_domains"] = job.Request.SafeDomain
+		inputs["inject_dir"] = injectDir
+		inputs["orientation"] = strDefault(job.Request.Orientation, "unspecified")
+		inputs["link_policy"] = strDefault(job.Request.LinkPolicy, "allowlist")
+		inputs["fullscreen"] = FormatBool(job.Request.Fullscreen)
+		inputs["pull_refresh"] = FormatBool(job.Request.PullRefresh)
+		inputs["progress_bar"] = FormatBool(job.Request.ProgressBar)
+		inputs["file_upload"] = FormatBool(job.Request.EnableFileUpload)
+		inputs["camera"] = FormatBool(job.Request.EnableCamera)
+		inputs["download"] = FormatBool(job.Request.EnableDownload)
+		inputs["push_placeholder"] = FormatBool(job.Request.PushPlaceholder)
 	case common.PlatformWindows:
 		inputs["width"] = itoaDefault(job.Request.Width, 1200)
 		inputs["height"] = itoaDefault(job.Request.Height, 780)
@@ -260,6 +277,52 @@ func fail(o CloudJobOptions, err error) error {
 	})
 	o.log("✗ " + err.Error())
 	return err
+}
+
+func (o CloudJobOptions) uploadAndroidInject(ctx context.Context, client *Client, ref, iconPrefix string) (string, error) {
+	job, err := o.Store.Get(o.JobID)
+	if err != nil {
+		return "", err
+	}
+	if len(job.Request.Inject) == 0 {
+		return "", nil
+	}
+	remotePrefix := fmt.Sprintf("%s/%s/inject", iconPrefix, o.JobID)
+	localDir := filepath.Join(job.Dir, "inject")
+	if err := os.MkdirAll(localDir, 0o755); err != nil {
+		return "", err
+	}
+	uploaded := 0
+	for _, raw := range job.Request.Inject {
+		path := strings.TrimSpace(raw)
+		if path == "" {
+			continue
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return "", fmt.Errorf("读取注入文件失败 %s: %w", path, err)
+		}
+		base := filepath.Base(path)
+		ext := strings.ToLower(filepath.Ext(base))
+		if ext != ".js" && ext != ".css" {
+			o.log("跳过非 js/css 注入: " + base)
+			continue
+		}
+		localCopy := filepath.Join(localDir, base)
+		if err := os.WriteFile(localCopy, data, 0o644); err != nil {
+			return "", err
+		}
+		remotePath := remotePrefix + "/" + base
+		o.log("上传注入脚本: " + remotePath)
+		if _, err := client.UploadContent(ctx, ref, remotePath, data, "ci: upload inject for "+o.JobID); err != nil {
+			return "", fmt.Errorf("上传注入失败: %w", err)
+		}
+		uploaded++
+	}
+	if uploaded == 0 {
+		return "", nil
+	}
+	return remotePrefix, nil
 }
 
 type pakePlatformSpec struct {

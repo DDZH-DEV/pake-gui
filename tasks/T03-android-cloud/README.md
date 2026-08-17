@@ -17,14 +17,16 @@
 
 - [x] 本任务目录
 - [x] `android-shell/` 通用 WebView 模板
-- [x] `.github/workflows/build-android.yml`（`assembleDebug` + `push.paths` 自注册）
+- [x] `.github/workflows/build-android.yml`（debug / release / aab）
 - [x] `specFor(android)` + `/api/cloud/jobs` 接通
-- [x] GUI 启用 Android 选项，产物目录 `builds/android/`
+- [x] GUI：Android 选项 + 产物格式联动
+- [x] UA / 注入 / Safe Domains / 外链 / 文件相机下载 / 推送占位
 - [x] 文档 `docs/android.md`
 
 ## 非目标（本版）
 
-- 不在 Windows GUI 进程内跑 Android SDK
+- 不在 Windows 本机装 Android SDK / 不跑本地 Gradle
 - 不用 Capacitor / Tauri Android
-- 不沿用 `android-webview-shell/` 的产品写死逻辑与 Homebrew `aapt` 脚本
-- 不上架、不打正式签名
+- 不接完整 FCM（仅 JS 占位）
+- 不上架商店审核流程
+- 不把 keystore 提交进 git（只用 Actions Secrets）

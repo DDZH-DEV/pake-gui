@@ -1,12 +1,9 @@
-// Package android is reserved for Android cloud-build adaptation (T03).
+// Package android documents the Android cloud-build path (T03).
+//
+// Builds run on GitHub Actions (.github/workflows/build-android.yml) using the
+// generic WebView template in android-shell/. The GUI submits via the shared
+// github.RunCloudJob with platform=android; artifacts land in builds/android/.
 package android
 
-import "fmt"
-
-// ErrNotImplemented is returned until T03 is scheduled.
-var ErrNotImplemented = fmt.Errorf("android cloud build is reserved (T03)")
-
-// Submit is a stub so callers can branch on platform without missing packages.
-func Submit(_ any) error {
-	return ErrNotImplemented
-}
+// WorkflowFile is the GitHub Actions workflow that builds the debug APK.
+const WorkflowFile = "build-android.yml"

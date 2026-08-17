@@ -1,50 +1,62 @@
-# Android 云端打包（预留）
+# Android 云端打包
 
-当前 **未实现** 真实 APK/AAB 构建。GUI「云端目标」中 Android 为禁用项。
+在 **GitHub Actions 的 Ubuntu runner** 上，用仓库内通用 WebView 模板 `android-shell/` 生成 **debug 签名 APK**。  
+本机无需 Android SDK / JDK / Gradle。
 
-## 为什么不能在 Windows 上一键出 APK
+工作流文件：`.github/workflows/build-android.yml`
 
-- Pake / Tauri 主路径是桌面（Win / macOS / Linux）  
-- 网页套壳 APK 通常依赖 **Android SDK / NDK、Gradle、JDK**，需在 Linux CI 或 Android 工程中构建  
-- 单纯 `go build` 或本机 `pake` **不能**从网址直接生成可安装 APK
+## 这一版做什么、不做什么
 
-## 已占位内容（勿删，便于后续接入）
+| 做 | 不做 |
+|----|------|
+| 把网址包进 WebView APK | Google Play 上架、AAB |
+| debug 签名，可侧载安装 | 提交 release keystore |
+| 同源页面内打开，外链走系统浏览器 | 婚礼派等产品专用 JS 桥 / 相册 |
+| 包名用 Identifier，或按域名生成 | 在 Windows GUI 进程内跑 SDK |
 
-| 路径 | 作用 |
-|------|------|
-| `tasks/T03-android-cloud/` | 任务规格与 checklist |
-| `internal/cloud/android/` | 适配层 stub（返回 NotImplemented） |
-| `configs/android/` | 参数模板目录 |
-| `builds/android/` | 未来产物目录 |
-| `.github/workflows/build-android.yml` | 占位工作流（目前会主动失败并提示） |
+安装时系统会提示「未知来源 / 非正式签名」，属预期。
 
-## 约定（实现时遵守）
+## 前置条件
 
-与 macOS 共用：
+1. 本仓库已推送到 GitHub，且 Actions 已启用  
+2. 完成 [GitHub 授权](./github-oauth.md)  
+3. 「打包」Tab 已填好网址、应用名；**Identifier** 建议填 Android 包名（如 `com.example.app`），留空则按网址域名反转生成（`hlai.yingdedao.cn` → `cn.yingdedao.hlai`）
 
-- `internal/cloud/common` Job 模型  
-- `internal/cloud/github` 授权与 API  
-- `/api/cloud/jobs`，`platform: "android"`
+首次使用前，确认 Actions 侧边栏已出现 **Build Android APK (WebView)**。若提示 workflow 404，再 push 一次 `build-android.yml`（文件带 `push.paths` 自注册）。
 
-独立：
+## 用 Pake GUI 提交
 
-- workflow、`configs/android/`、`builds/android/`  
-- UI 平台选项启用后再开放提交  
+1. 打开 **云端** Tab 并完成授权  
+2. 云端目标选 **Android APK**  
+3. 点 **提交 Android 云端（APK）**  
+4. 成功后产物在 `builds/android/`，一般是 `{jobId}-debug.apk`
 
-## 候选技术方案（未选定）
+也可从 **任务** Tab 对本机或其它云端记录点 **回填** 后再提交。
 
-| 方案 | 说明 |
-|------|------|
-| PakePlus 类流水线 | 偏「网址 → 移动端」产品线 |
-| Capacitor / Cordova CI | 标准 WebView 壳 + GitHub Actions |
-| 自建 Android WebView 模板仓 | 用 Actions 注入 URL/图标后 `gradle assemble` |
+### 图标如何传到云端
 
-实现时再选，**不要**在 Windows GUI 进程内直接跑完整 Android 工具链。
+与 macOS / Windows 相同：本地图标经 Contents API 上传到 `ci-assets/android/{jobId}/icon.*`，构建时转成启动图标。未选图标则用模板默认图标。
 
-## 现阶段建议
+## 模板能力（`android-shell/`）
 
-1. Windows：本机打包，见 [windows.md](./windows.md)  
-2. macOS：云端 DMG，见 [macos.md](./macos.md)  
-3. Android：单独立项后再填 T03  
+- JavaScript、DOM Storage、第三方 Cookie  
+- 返回键：先退 WebView 历史，再退出应用  
+- 同主机（含子域）留在应用内；其它 http(s)、mailto、tel、下载用系统应用打开  
+- `http://` 网址会打开明文流量（`usesCleartextTraffic`）
 
-任务索引：`tasks/T03-android-cloud/README.md`
+旧目录 `android-webview-shell/` 只作参考，**不是**正式模板。
+
+## 在 GitHub 网页手动跑
+
+1. 仓库 → **Actions** → **Build Android APK (WebView)** → **Run workflow**  
+2. 填写 url、name；identifier / icon 可选  
+
+## 安装 APK
+
+把 `builds/android/` 里的 apk 拷到手机，允许「安装未知应用」后打开即可。debug 签名不能用于上架。
+
+## 相关
+
+- 授权：[github-oauth.md](./github-oauth.md)  
+- 排障：[troubleshooting.md](./troubleshooting.md)  
+- 任务规格：`tasks/T03-android-cloud/README.md`

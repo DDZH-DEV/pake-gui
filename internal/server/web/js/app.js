@@ -170,7 +170,7 @@ function fillForm(opts, goTab) {
   const nw = document.getElementById("cloud-new-window");
   if (nw && opts.newWindow != null) nw.checked = Boolean(opts.newWindow);
   const platEl = document.getElementById("cloud-platform");
-  if (platEl && (opts.platform === "macos" || opts.platform === "windows")) {
+  if (platEl && (opts.platform === "macos" || opts.platform === "windows" || opts.platform === "android")) {
     platEl.value = opts.platform;
   }
   const targets = document.getElementById("cloud-targets");
@@ -199,8 +199,8 @@ function fillForm(opts, goTab) {
   const label = opts.name || "未命名";
   appendLog(
     tab === "cloud"
-      ? `已回填「${label}」→ 云端 Tab，可直接提交 macOS`
-      : `已回填「${label}」→ 打包 Tab（也可再切到「云端」打 macOS）`
+      ? `已回填「${label}」→ 云端 Tab，可直接提交`
+      : `已回填「${label}」→ 打包 Tab（也可再切到「云端」提交）`
   );
 }
 
@@ -798,8 +798,8 @@ async function testGitHubSettings() {
   }
   let msg = `连接成功 · 默认分支 ${data.defaultBranch || "?"}`;
   if (data.workflowRegistered === false) {
-    msg += " · ⚠ macOS workflow 未注册";
-    appendLog("警告：" + (data.workflowHint || "build-macos.yml 尚未被 GitHub Actions 注册"));
+    msg += " · ⚠ 部分 workflow 未注册";
+    appendLog("警告：" + (data.workflowHint || "有 workflow 尚未被 GitHub Actions 注册"));
   } else if (data.workflowRegistered === true) {
     msg += " · workflow 已注册";
   }
@@ -1047,12 +1047,8 @@ async function submitCloudMacOS() {
     return;
   }
   const platform = document.getElementById("cloud-platform")?.value || "macos";
-  if (platform === "android") {
-    appendLog("Android 云端打包尚未实现（T03 预留）");
-    return;
-  }
-
   const isWin = platform === "windows";
+  const isAndroid = platform === "android";
   const body = {
     platform,
     url: opts.url,
@@ -1063,13 +1059,13 @@ async function submitCloudMacOS() {
     appVersion: opts.appVersion,
     identifier: opts.identifier,
     hideTitleBar: opts.hideTitleBar,
-    multiArch: isWin ? false : document.getElementById("cloud-multi-arch")?.checked === true,
-    newWindow: document.getElementById("cloud-new-window")?.checked === true,
-    targets: isWin ? "exe" : document.getElementById("cloud-targets")?.value || "dmg",
+    multiArch: isWin || isAndroid ? false : document.getElementById("cloud-multi-arch")?.checked === true,
+    newWindow: isAndroid ? false : document.getElementById("cloud-new-window")?.checked === true,
+    targets: isAndroid ? "apk" : isWin ? "exe" : document.getElementById("cloud-targets")?.value || "dmg",
   };
 
-  const label = isWin ? "Windows exe" : "macOS";
-  const outHint = isWin ? "builds/windows" : "builds/macos";
+  const label = isAndroid ? "Android APK" : isWin ? "Windows exe" : "macOS";
+  const outHint = isAndroid ? "builds/android" : isWin ? "builds/windows" : "builds/macos";
   appendLog("—— 提交 " + label + " 云端任务 ——");
   const res = await api("/api/cloud/jobs", {
     method: "POST",
@@ -1090,6 +1086,7 @@ async function submitCloudMacOS() {
 function syncCloudPlatformUI() {
   const platform = document.getElementById("cloud-platform")?.value || "macos";
   const isWin = platform === "windows";
+  const isAndroid = platform === "android";
   const wf = document.getElementById("gh-workflow");
   if (wf) {
     const next = workflowForPlatform(platform);
@@ -1098,8 +1095,14 @@ function syncCloudPlatformUI() {
   const multi = document.getElementById("cloud-multi-arch-field");
   const hint = document.getElementById("cloud-targets-hint");
   const targets = document.getElementById("cloud-targets");
+  const targetsField = document.getElementById("cloud-targets-field");
+  const newWin = document.getElementById("cloud-new-window-field");
+  const androidHint = document.getElementById("cloud-android-hint");
   const btn = document.getElementById("btn-cloud-submit");
-  if (multi) multi.hidden = isWin;
+  if (multi) multi.hidden = isWin || isAndroid;
+  if (targetsField) targetsField.hidden = isAndroid;
+  if (newWin) newWin.hidden = isAndroid;
+  if (androidHint) androidHint.hidden = !isAndroid;
   if (hint) hint.hidden = !isWin;
   if (targets) {
     targets.disabled = isWin;
@@ -1110,16 +1113,18 @@ function syncCloudPlatformUI() {
     if (isWin) targets.value = "exe";
     else if (targets.value === "exe") targets.value = "dmg";
   }
-  if (btn) btn.textContent = isWin ? "提交 Windows 云端（exe）" : "提交 macOS 云端";
+  if (btn) {
+    if (isAndroid) btn.textContent = "提交 Android 云端（APK）";
+    else if (isWin) btn.textContent = "提交 Windows 云端（exe）";
+    else btn.textContent = "提交 macOS 云端";
+  }
 }
 
 function onWorkflowChange() {
   const wf = document.getElementById("gh-workflow")?.value;
   const platEl = document.getElementById("cloud-platform");
   if (!platEl) return;
-  const next = platformForWorkflow(wf);
-  if (next === "android") return;
-  platEl.value = next;
+  platEl.value = platformForWorkflow(wf);
   syncCloudPlatformUI();
 }
 

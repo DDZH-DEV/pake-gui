@@ -17,7 +17,7 @@
       <span class="brand-mark" aria-hidden="true"></span>
       <div>
         <p class="brand-name">Pake GUI</p>
-        <p class="brand-tag">本机 Windows · 云端 Windows exe / macOS · Android 预留</p>
+        <p class="brand-tag">本机 Windows · 云端 Windows exe / macOS / Android APK</p>
       </div>
     </div>
     <div class="top-actions">
@@ -148,7 +148,7 @@
               <summary>高级选项</summary>
               <div class="field-grid">
                 <label class="field">
-                  <span>Bundle ID</span>
+                  <span>Bundle ID / Android 包名</span>
                   <input name="identifier" placeholder="com.example.app" />
                 </label>
                 <label class="field">
@@ -221,8 +221,8 @@
         <div class="tab-grid">
           <div class="panel form-panel">
             <div class="panel-head">
-              <h1>云端 · Windows exe / macOS</h1>
-              <p id="cloud-head-desc">已支持 <strong>Windows exe</strong>（免装 VS，不打 MSI）、<strong>macOS DMG</strong>。Android 预留。参数来自「打包」页；仓库默认 <code>DDZH-DEV/pake-gui</code>。</p>
+              <h1>云端 · Windows / macOS / Android</h1>
+              <p id="cloud-head-desc">已支持 <strong>Windows exe</strong>（免装 VS，不打 MSI）、<strong>macOS DMG</strong>、<strong>Android debug APK</strong>（可侧载，不上架）。参数来自「打包」页；仓库默认 <code>DDZH-DEV/pake-gui</code>。</p>
             </div>
 
             <div class="oauth-bar">
@@ -255,6 +255,7 @@
                 <select id="gh-workflow">
                   <option value="build-macos.yml">build-macos.yml</option>
                   <option value="build-windows.yml">build-windows.yml</option>
+                  <option value="build-android.yml">build-android.yml</option>
                 </select>
                 <span class="field-hint">随「云端目标」自动切换</span>
               </label>
@@ -267,7 +268,7 @@
                 <select id="cloud-platform">
                   <option value="macos">macOS（GitHub）</option>
                   <option value="windows">Windows exe（GitHub，免装 VS）</option>
-                  <option value="android" disabled>Android（预留）</option>
+                  <option value="android">Android APK（GitHub，可侧载）</option>
                 </select>
               </label>
               <label class="field" id="cloud-targets-field">
@@ -280,7 +281,8 @@
                 <span class="field-hint" id="cloud-targets-hint" hidden>云端 Windows 固定只出 exe，不打 MSI</span>
               </label>
               <label class="check" id="cloud-multi-arch-field"><input type="checkbox" id="cloud-multi-arch" /> Universal（Intel+Apple，更慢）</label>
-              <label class="check"><input type="checkbox" id="cloud-new-window" /> 允许站点开新窗口</label>
+              <label class="check" id="cloud-new-window-field"><input type="checkbox" id="cloud-new-window" /> 允许站点开新窗口</label>
+              <p class="field-hint span-2" id="cloud-android-hint" hidden>云端 Android 使用仓库内 WebView 模板，出 debug 签名 APK（可侧载安装；不上架、不打 AAB）。包名优先用「打包」页 Identifier，否则按网址域名生成。</p>
             </div>
 
             <details class="advanced token-box">
@@ -360,7 +362,7 @@
             <li><strong>本机打包</strong>：需要 Node、pake-cli、Rust、MSVC。</li>
             <li><strong>云端 Windows</strong>：GitHub Actions 出 exe，本机不用装 Visual Studio。</li>
             <li><strong>云端 macOS</strong>：只需 GitHub 授权；构建在 Actions 的 macos runner 上完成。</li>
-            <li><strong>Android</strong>：已预留目录与工作流，尚未接入。</li>
+            <li><strong>云端 Android</strong>：GitHub Actions 出 debug APK，本机不用装 Android SDK；可侧载，不上架。</li>
             <li>产物目录：<code>builds/windows</code>、<code>builds/macos</code>、<code>builds/android</code>。</li>
           </ul>
         </div>

@@ -1,6 +1,6 @@
 # GitHub 授权
 
-云端打包（macOS / Windows exe / 未来 Android）需要访问你的仓库并触发 Actions。  
+云端打包（macOS / Windows exe / Android APK）需要访问你的仓库并触发 Actions。  
 推荐 **Device Flow**；也可手动粘贴 PAT。
 
 默认仓库：`DDZH-DEV/pake-gui`

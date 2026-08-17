@@ -11,6 +11,11 @@ builds/*
 data/
 ci-assets/
 .DS_Store
+*.keystore
+*.jks
+android-shell/.gradle/
+android-shell/**/build/
+android-shell/local.properties
 PakeGUI.exe
 PakeGUI-console.exe
 pake-gui.exe

@@ -6,7 +6,7 @@
 |----|------|------|------|------|----------|
 | T01 | [T01-local-windows](./T01-local-windows/) | Windows | 本地 pake | 基本完成 | [docs/windows.md](../docs/windows.md) |
 | T02 | [T02-github-macos-cloud](./T02-github-macos-cloud/) | macOS | GitHub Actions | 已实现 | [docs/macos.md](../docs/macos.md) |
-| T03 | [T03-android-cloud](./T03-android-cloud/) | Android | GitHub Actions（预留） | 占位 | [docs/android.md](../docs/android.md) |
+| T03 | [T03-android-cloud](./T03-android-cloud/) | Android | GitHub Actions（debug APK） | 已实现 | [docs/android.md](../docs/android.md) |
 | T04 | [T04-github-windows-cloud](./T04-github-windows-cloud/) | Windows | GitHub Actions（仅 exe） | 已实现 | [docs/windows.md](../docs/windows.md) |
 
 ## 文档入口
@@ -22,4 +22,4 @@
 - Device Flow 授权 + 浏览器打开修复  
 - 任务回填（本机 ↔ 云端）  
 - Targets 下拉、注入目录扫描  
-- 窗口选项按平台分组标注  
+- 云端 Android debug APK（`android-shell` + `build-android.yml`） 

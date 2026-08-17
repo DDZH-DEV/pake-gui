@@ -15,7 +15,7 @@ import (
 	"pake-gui/internal/cloud/common"
 )
 
-// CloudJobOptions drives a GitHub Actions pake build (macOS DMG or Windows exe).
+// CloudJobOptions drives a GitHub Actions build (macOS DMG, Windows exe, or Android APK).
 type CloudJobOptions struct {
 	DataDir   string
 	BuildsDir string
@@ -112,14 +112,21 @@ func RunCloudJob(ctx context.Context, o CloudJobOptions) error {
 		"url":         job.Request.URL,
 		"name":        job.Request.Name,
 		"icon":        iconInput,
-		"width":       itoaDefault(job.Request.Width, 1200),
-		"height":      itoaDefault(job.Request.Height, 780),
 		"app_version": strDefault(job.Request.AppVersion, "1.0.0"),
 		"identifier":  job.Request.Identifier,
-		"new_window":  FormatBool(job.Request.NewWindow),
 		"job_id":      o.JobID,
 	}
-	if platform != common.PlatformWindows {
+	switch platform {
+	case common.PlatformAndroid:
+		// url / name / icon / app_version / identifier / job_id only
+	case common.PlatformWindows:
+		inputs["width"] = itoaDefault(job.Request.Width, 1200)
+		inputs["height"] = itoaDefault(job.Request.Height, 780)
+		inputs["new_window"] = FormatBool(job.Request.NewWindow)
+	default:
+		inputs["width"] = itoaDefault(job.Request.Width, 1200)
+		inputs["height"] = itoaDefault(job.Request.Height, 780)
+		inputs["new_window"] = FormatBool(job.Request.NewWindow)
 		inputs["hide_title_bar"] = FormatBool(job.Request.HideTitleBar)
 		inputs["multi_arch"] = FormatBool(job.Request.MultiArch)
 		inputs["targets"] = strDefault(job.Request.Targets, spec.DefaultTargets)
@@ -264,7 +271,8 @@ type pakePlatformSpec struct {
 }
 
 func specFor(p common.Platform) pakePlatformSpec {
-	if p == common.PlatformWindows {
+	switch p {
+	case common.PlatformWindows:
 		return pakePlatformSpec{
 			Label:          "Windows",
 			Workflow:       "build-windows.yml",
@@ -272,13 +280,22 @@ func specFor(p common.Platform) pakePlatformSpec {
 			ArtifactSuffix: "-Windows",
 			DefaultTargets: "exe",
 		}
-	}
-	return pakePlatformSpec{
-		Label:          "macOS",
-		Workflow:       "build-macos.yml",
-		IconPrefix:     "ci-assets/macos",
-		ArtifactSuffix: "-macOS",
-		DefaultTargets: "dmg",
+	case common.PlatformAndroid:
+		return pakePlatformSpec{
+			Label:          "Android",
+			Workflow:       "build-android.yml",
+			IconPrefix:     "ci-assets/android",
+			ArtifactSuffix: "-Android",
+			DefaultTargets: "apk",
+		}
+	default:
+		return pakePlatformSpec{
+			Label:          "macOS",
+			Workflow:       "build-macos.yml",
+			IconPrefix:     "ci-assets/macos",
+			ArtifactSuffix: "-macOS",
+			DefaultTargets: "dmg",
+		}
 	}
 }
 

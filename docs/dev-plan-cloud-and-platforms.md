@@ -17,14 +17,14 @@ pake-gui/
 │   ├── README.md                   # 任务索引与状态
 │   ├── T01-local-windows/          # 本地 Windows 打包（已基本完成）
 │   ├── T02-github-macos-cloud/     # 下一阶段：GUI → Actions → DMG
-│   └── T03-android-cloud/          # 预留：安卓云端打包
+│   └── T03-android-cloud/          # 安卓云端 debug APK
 │
 ├── internal/
 │   ├── pake/                       # 现有：本地 pake-cli 调用（Windows 主路径）
 │   ├── cloud/                      # 云端编排（与本地打包解耦）
 │   │   ├── common/                 # Job 模型、状态机、产物落盘约定
 │   │   ├── github/                 # Token、workflow_dispatch、Contents、Artifacts
-│   │   └── android/                # 预留：安卓 CI 适配（可先空包 + stub）
+│   │   └── android/                # 文档包：说明走共享 RunCloudJob + android-shell
 │   └── server/                     # HTTP API + 前端；只做路由，不塞平台细节
 │
 ├── configs/                        # 可复用的打包参数模板（按平台）
@@ -51,7 +51,7 @@ pake-gui/
 └── .github/workflows/
     ├── build-macos.yml             # 已有
     ├── build-windows.yml           # Windows exe（iterative-build）
-    └── build-android.yml           # 预留（可先 workflow 注释或 if: false）
+    └── build-android.yml           # Android debug APK（android-shell）
 ```
 
 ### 为什么这样分
@@ -102,15 +102,11 @@ pake-gui/
   `ci-assets/macos/{jobId}/icon.png`  
   （不要覆盖同一文件名，避免并发任务互相踩）
 
-### T03 — Android 云端（预留，先占位不实现）
+### T03 — Android 云端（debug APK）
 
-- **目录**：`tasks/T03-android-cloud/` + `internal/cloud/android/` + `configs/android/` + `builds/android/`
-- **建议约定（现在就定好，避免以后大改）**：
-  - 与 macOS **共用** `internal/cloud/common` 的 Job 模型
-  - 与 macOS **共用** GitHub 客户端（Token、仓库）
-  - **不同** workflow 文件、不同 artifact 后缀（`.apk` / `.aab`）
-  - UI 用「目标平台」切换：`windows(local) | macos(cloud) | android(cloud)`
-  - 技术方案候选（实现时再定）：PakePlus / Capacitor CI / 自建 Android WebView 模板；**不在 Windows 本机硬编 APK**
+- **目录**：`tasks/T03-android-cloud/` + `android-shell/` + `builds/android/`
+- **已选定方案**：自建 WebView 模板 + GitHub Actions `assembleDebug`；不在 Windows 本机硬编 APK
+- **产物**：debug 签名 APK（可侧载）；不上架、不打 AAB
 
 ---
 

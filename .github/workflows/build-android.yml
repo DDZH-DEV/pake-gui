@@ -1,25 +1,116 @@
-# Build Android app via GitHub Actions (reserved for T03).
-# Keep disabled until Android pipeline is chosen.
-name: Build Android App (Reserved)
+# Build a debug-signed APK from android-shell (generic WebView wrapper).
+# First version: sideload only. No Play Store / AAB / release keystore.
+name: Build Android APK (WebView)
 
 on:
+  # Self-path push registers the workflow so GUI/API dispatch is not 404.
+  # The job itself only runs on workflow_dispatch.
+  push:
+    paths:
+      - ".github/workflows/build-android.yml"
+      - "android-shell/**"
   workflow_dispatch:
     inputs:
       url:
-        description: "Website URL (placeholder)"
+        description: "Website URL to wrap"
         required: true
         type: string
       name:
-        description: "App name (placeholder)"
+        description: "App name (shown under the launcher icon)"
         required: true
         type: string
+      icon:
+        description: "Icon URL or repo-relative path (.png / .ico / .jpg). Empty = default"
+        required: false
+        type: string
+        default: ""
+      app_version:
+        description: "versionName"
+        required: false
+        type: string
+        default: "1.0.0"
+      identifier:
+        description: "Android applicationId (e.g. com.example.app). Empty = from URL host"
+        required: false
+        type: string
+        default: ""
+      job_id:
+        description: "Client job id (from Pake GUI cloud submit)"
+        required: false
+        type: string
+        default: ""
 
 jobs:
-  reserved:
-    name: placeholder
+  build-android:
+    name: Android debug APK
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     steps:
-      - name: Not implemented
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-34 build-tools;34.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      - name: Install ImageMagick (icon convert)
+        if: ${{ inputs.icon != '' }}
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
+      - name: Prepare template (app id / icon)
+        id: prep
+        env:
+          PAKE_START_URL: ${{ inputs.url }}
+          PAKE_IDENTIFIER: ${{ inputs.identifier }}
+          PAKE_ICON: ${{ inputs.icon }}
+        run: python3 android-shell/scripts/ci-prepare.py
+
+      - name: Assemble debug APK
+        working-directory: android-shell
+        env:
+          PAKE_START_URL: ${{ inputs.url }}
+          PAKE_APP_NAME: ${{ inputs.name }}
+          PAKE_APP_ID: ${{ steps.prep.outputs.app_id }}
+          PAKE_APP_VERSION: ${{ inputs.app_version }}
+          PAKE_CLEARTEXT: ${{ steps.prep.outputs.cleartext }}
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Collect APK
+        shell: bash
         run: |
-          echo "T03 Android cloud build is reserved. See tasks/T03-android-cloud/"
-          exit 1
+          set -euo pipefail
+          mkdir -p dist-android
+          SRC="android-shell/app/build/outputs/apk/debug/app-debug.apk"
+          if [ ! -f "$SRC" ]; then
+            echo "debug APK not found"
+            find android-shell/app/build/outputs -type f || true
+            exit 1
+          fi
+          JOB="${{ inputs.job_id }}"
+          if [ -z "$JOB" ]; then
+            JOB="app"
+          fi
+          cp -f "$SRC" "dist-android/${JOB}-debug.apk"
+          ls -la dist-android
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.job_id || inputs.name }}-Android
+          path: dist-android/
+          retention-days: 7
+          if-no-files-found: error

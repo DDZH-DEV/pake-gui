@@ -47,9 +47,9 @@ failed to run ...\light.exe
 
 处理：
 
-1. 确认默认分支上有 `.github/workflows/build-macos.yml`  
+1. 确认默认分支上有对应 workflow 文件（`build-macos.yml` / `build-windows.yml` / `build-android.yml`）  
 2. **再 push 一次该文件**（当前 workflow 带 `push.paths` 自注册；job 仅在 `workflow_dispatch` 时真正打包）  
-3. 打开 https://github.com/DDZH-DEV/pake-gui/actions ，侧边栏应出现 **Build macOS App (Pake)**  
+3. 打开 https://github.com/DDZH-DEV/pake-gui/actions ，侧边栏应出现对应工作流  
 4. GUI 里再点 **测试连接**（应提示 workflow 已注册）后重新提交
 
 ---
@@ -105,7 +105,7 @@ failed to run ...\light.exe
 |------|------|
 | macOS | 不能本机交叉编；用 [macos.md](./macos.md) 云端 |
 | Windows exe | 可不装 VS，用云端 `build-windows.yml`（公开仓免费） |
-| Android | 不能本机一键 APK；见 [android.md](./android.md) |
+| Android | 不能本机一键 APK；用 [android.md](./android.md) 云端 debug APK |
 
 ---
 
@@ -124,9 +124,15 @@ failed to run ...\light.exe
 
 ---
 
-## 历史任务如何接着打 Mac
+## Android：安装 APK 提示未知来源 / 非正式签名
 
-**任务** Tab → 本机记录 → **回填·云端** → 在云端 Tab 提交 macOS。
+第一版是 **debug 签名**，不能上架。在系统设置里允许该文件管理器「安装未知应用」后再打开 apk。
+
+---
+
+## 历史任务如何接着打 Mac / Win / Android
+
+**任务** Tab → 记录 → **回填** / **回填·云端** → 在云端 Tab 选目标后提交。
 
 ---
 

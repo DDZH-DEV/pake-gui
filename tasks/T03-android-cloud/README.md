@@ -1,34 +1,30 @@
-# T03 — Android 云端打包（预留）
+# T03 — Android 云端打包
 
-## 目标（未来）
+## 目标
 
-与 T02 同一套云端 Job 模型，提交到 GitHub Actions，下载 APK/AAB 到 `builds/android/`。
+与 T02 / T04 同一套云端 Job 模型，提交到 GitHub Actions，下载 debug APK 到 `builds/android/`。
 
-## 现在就要定的约定
+## 约定（已落地）
 
-- 复用 `internal/cloud/common`、`internal/cloud/github`
-- 新建 `internal/cloud/android`（适配层，可先 stub）
-- 独立 workflow：`.github/workflows/build-android.yml`
-- 独立配置：`configs/android/`
+- 复用 `internal/cloud/common`、`internal/cloud/github.RunCloudJob`
+- `platform: "android"` → workflow `build-android.yml`
+- 通用模板：`android-shell/`（Gradle + WebView，占位符由 CI 注入）
 - 独立产物：`builds/android/`
-- API 用同一套 `/api/cloud/jobs`，`platform: "android"`
-- UI 平台选项先 **disabled**，文案：「预留」
+- 图标：`ci-assets/android/{jobId}/`
+- 第一版只出 **debug 签名 APK**（可侧载）；不上架、不打 AAB、不提交 keystore
 
-## 技术方案（实现时再选，勿绑死）
-
-候选：PakePlus 类流水线 / Capacitor CI / 自建 Android WebView 模板仓库。  
-共同点：必须在 Linux/Android SDK 的 CI 环境构建，不在 Windows GUI 进程内直接 `gradle`。
-
-## 占位 Checklist
+## Checklist
 
 - [x] 本任务目录
-- [ ] `internal/cloud/android` stub（`NotImplemented`）
-- [ ] `configs/android/.gitkeep`
-- [ ] `builds/android/.gitkeep`
-- [ ] workflow stub（`if: false` 或仅文档）
-- [ ] UI 入口 disabled
+- [x] `android-shell/` 通用 WebView 模板
+- [x] `.github/workflows/build-android.yml`（`assembleDebug` + `push.paths` 自注册）
+- [x] `specFor(android)` + `/api/cloud/jobs` 接通
+- [x] GUI 启用 Android 选项，产物目录 `builds/android/`
+- [x] 文档 `docs/android.md`
 
-## 非目标（当前）
+## 非目标（本版）
 
-- 不实现真实打包
-- 不引入 Android SDK 到本机开发依赖
+- 不在 Windows GUI 进程内跑 Android SDK
+- 不用 Capacitor / Tauri Android
+- 不沿用 `android-webview-shell/` 的产品写死逻辑与 Homebrew `aapt` 脚本
+- 不上架、不打正式签名

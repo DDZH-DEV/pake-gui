@@ -117,7 +117,7 @@ func (c *Client) Test(ctx context.Context) (map[string]any, error) {
 
 	// Prefer checking the configured workflow file (404 = not registered yet).
 	var missing []string
-	for _, workflow := range []string{DefaultWorkflow, "build-windows.yml"} {
+	for _, workflow := range []string{DefaultWorkflow, "build-windows.yml", "build-android.yml"} {
 		if _, _, e := c.do(ctx, http.MethodGet, fmt.Sprintf("/repos/%s/%s/actions/workflows/%s",
 			c.Owner, c.Repo, url.PathEscape(workflow)), nil); e != nil {
 			missing = append(missing, workflow)
@@ -209,14 +209,14 @@ func (c *Client) DispatchWorkflow(ctx context.Context, workflowFile, ref string,
 }
 
 type workflowRun struct {
-	ID         int64     `json:"id"`
-	Status     string    `json:"status"`
-	Conclusion string    `json:"conclusion"`
-	HTMLURL    string    `json:"html_url"`
-	CreatedAt  time.Time `json:"created_at"`
-	Name       string    `json:"name"`
-	DisplayTitle string  `json:"display_title"`
-	Path       string    `json:"path"`
+	ID           int64     `json:"id"`
+	Status       string    `json:"status"`
+	Conclusion   string    `json:"conclusion"`
+	HTMLURL      string    `json:"html_url"`
+	CreatedAt    time.Time `json:"created_at"`
+	Name         string    `json:"name"`
+	DisplayTitle string    `json:"display_title"`
+	Path         string    `json:"path"`
 }
 
 type runsResponse struct {

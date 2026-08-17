@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"pake-gui/internal/applog"
-	"pake-gui/internal/cloud/android"
 	"pake-gui/internal/cloud/common"
 	"pake-gui/internal/cloud/github"
 )
@@ -130,11 +129,11 @@ func (s *Server) handleCloudGitHubOAuthStart(w http.ResponseWriter, r *http.Requ
 	}
 	applog.Info("github device flow started user_code=%s opened=%v", start.UserCode, opened)
 	writeJSON(w, map[string]any{
-		"ok":     true,
-		"device": start,
-		"opened": opened,
+		"ok":        true,
+		"device":    start,
+		"opened":    opened,
 		"openError": openErr,
-		"openUrl": openURL,
+		"openUrl":   openURL,
 	})
 }
 
@@ -229,11 +228,7 @@ func (s *Server) handleCloudJobs(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]any{"ok": false, "error": "url 和 name 必填"})
 			return
 		}
-		if platform == common.PlatformAndroid {
-			writeJSON(w, map[string]any{"ok": false, "error": android.ErrNotImplemented.Error()})
-			return
-		}
-		if platform != common.PlatformMacOS && platform != common.PlatformWindows {
+		if platform != common.PlatformMacOS && platform != common.PlatformWindows && platform != common.PlatformAndroid {
 			writeJSON(w, map[string]any{"ok": false, "error": "暂不支持的平台: " + string(platform)})
 			return
 		}

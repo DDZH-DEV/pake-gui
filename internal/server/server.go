@@ -125,7 +125,7 @@ func (s *Server) handleEnv(w http.ResponseWriter, r *http.Request) {
 		"tools":     st.Tools,
 		"ready":     st.Ready,
 		"pakeOk":    st.PakeOK,
-		"builds":    s.cfg.BuildsDir,
+		"builds":    s.defaultLocalOutDir(),
 		"injectDir": s.injectDir(),
 		"logPath":   applog.Path(),
 	})
@@ -162,6 +162,7 @@ func (s *Server) handlePreviewCmd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	opts.OutDir = outDir
+	_ = pake.NormalizePackageIdentity(&opts)
 	args, err := pake.BuildArgs(opts)
 	if err != nil {
 		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
@@ -177,7 +178,13 @@ func (s *Server) handlePreviewCmd(w http.ResponseWriter, r *http.Request) {
 	for _, a := range full {
 		cmd += " " + quote(a)
 	}
-	writeJSON(w, map[string]any{"ok": true, "command": cmd, "outDir": outDir})
+	writeJSON(w, map[string]any{
+		"ok":      true,
+		"command": cmd,
+		"outDir":  outDir,
+		"name":    opts.Name,
+		"title":   opts.Title,
+	})
 }
 
 func (s *Server) handleBuild(w http.ResponseWriter, r *http.Request) {
@@ -225,6 +232,9 @@ func (s *Server) handleBuild(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 	}
 
+	// Keep the user-facing name in history; Run may rewrite package name to ASCII.
+	historyOpts := opts
+
 	applog.Info("build start name=%s url=%s out=%s", opts.Name, opts.URL, outDir)
 	send("log", map[string]string{"line": "starting build…"})
 
@@ -241,7 +251,7 @@ func (s *Server) handleBuild(w http.ResponseWriter, r *http.Request) {
 	rec := projectRecord{
 		ID:        fmt.Sprintf("%d", time.Now().UnixMilli()),
 		CreatedAt: time.Now(),
-		Options:   opts,
+		Options:   historyOpts,
 		Result:    &result,
 	}
 	_ = s.appendHistory(rec)

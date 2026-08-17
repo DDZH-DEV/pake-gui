@@ -1,5 +1,6 @@
 # Build a Windows .exe with pake-cli on GitHub-hosted Windows runners.
-# Installer (MSI/NSIS) is skipped via --iterative-build so users need no local VS.
+# Cloud path is exe-only: pake's --iterative-build only skips DMG on macOS, so we
+# patch WinBuilder to pass tauri --no-bundle (avoids WiX light.exe / Chinese-name MSI failures).
 name: Build Windows EXE (Pake)
 
 on:
@@ -16,6 +17,11 @@ on:
         description: "App name"
         required: true
         type: string
+      title:
+        description: "Window title (empty = use name)"
+        required: false
+        type: string
+        default: ""
       icon:
         description: "Icon URL or repo-relative path (.ico / .png). Empty = site icon"
         required: false
@@ -89,7 +95,15 @@ jobs:
       - name: Install pake-cli
         run: npm install -g pake-cli
 
+      # pake --iterative-build is macOS-only in current pake-cli; Windows still runs WiX MSI.
+      # Force tauri --no-bundle + keepBinary so Chinese product names do not hit light.exe.
+      - name: Patch pake-cli for Windows exe-only
+        shell: bash
+        run: node .github/scripts/patch-pake-windows-exe-only.js
+
       - name: Build Windows exe
+        id: build
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -101,9 +115,13 @@ jobs:
             --height "${{ inputs.height }}"
             --app-version "${{ inputs.app_version }}"
             --iterative-build
+            --keep-binary
             --json
           )
 
+          if [ -n "${{ inputs.title }}" ]; then
+            ARGS+=(--title "${{ inputs.title }}")
+          fi
           if [ -n "${{ inputs.icon }}" ]; then
             ARGS+=(--icon "${{ inputs.icon }}")
           fi
@@ -132,8 +150,14 @@ jobs:
             case "$(basename "$f")" in
               node.exe|npm.exe|npx.exe|cargo.exe|rustc.exe|git.exe|pake.exe) return 0 ;;
             esac
-            cp -f "$f" dist-windows/
+            # Prefer a stable display name for the downloaded artifact.
+            local dest="dist-windows/${NAME}.exe"
+            if [ -f "$dest" ] && [ "$f" != "$dest" ]; then
+              dest="dist-windows/$(basename "$f")"
+            fi
+            cp -f "$f" "$dest"
             found=1
+            echo "Collected: $f -> $dest"
           }
 
           shopt -s nullglob
@@ -157,9 +181,12 @@ jobs:
 
           ls -la dist-windows || true
           if [ "$found" -eq 0 ]; then
-            echo "No .exe found after iterative build"
+            echo "No .exe found after Windows build (build step conclusion=${{ steps.build.outcome }})"
             find . "$PAKE_ROOT" -maxdepth 10 -name '*.exe' 2>/dev/null | head -n 50 || true
             exit 1
+          fi
+          if [ "${{ steps.build.outcome }}" != "success" ]; then
+            echo "Build step reported failure, but exe was recovered (common when WiX MSI fails)."
           fi
 
       - name: Upload Windows artifact

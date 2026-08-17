@@ -19,12 +19,14 @@ failed to run ...\light.exe
 ```
 
 **原因：** 应用名含中文等非 ASCII 时，WiX MSI 编码易失败；exe 往往已经编成功。  
+另外：`pake --iterative-build` 目前只在 macOS 跳过 DMG，Windows 仍会跑 MSI。
 
 **处理：**
 
-1. 应用名改英文（如 `HunliPai-AI`）后重打  
-2. 或只要 exe：勾选「快速迭代构建」  
-3. 从 pake 输出目录拷贝已生成的 exe 到 `builds/`
+1. 本机 / 云端新版本会把打包名转成拼音 ASCII，窗口标题保留中文 — 重新编译 GUI；云端还需把最新 `build-windows.yml` push 到默认分支  
+2. 或应用名改英文（如 `HunliPai-AI`）后重打  
+3. 或只要 exe：勾选「快速迭代构建」（本机）；云端 workflow 已强制 `--no-bundle` 只出 exe  
+4. 从 pake 输出目录拷贝已生成的 exe 到 `builds/windows/`
 
 详见 [windows.md](./windows.md)。
 

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"pake-gui/internal/cloud/common"
+	"pake-gui/internal/pake"
 )
 
 // CloudJobOptions drives a GitHub Actions build (macOS DMG, Windows exe, or Android APK).
@@ -137,6 +138,15 @@ func RunCloudJob(ctx context.Context, o CloudJobOptions) error {
 		inputs["download"] = FormatBool(job.Request.EnableDownload)
 		inputs["push_placeholder"] = FormatBool(job.Request.PushPlaceholder)
 	case common.PlatformWindows:
+		// Match local Windows packaging: ASCII package name + keep Chinese as window title.
+		// Avoids WiX light.exe failures when MSI is still attempted by older runners/workflows.
+		displayName := strings.TrimSpace(job.Request.Name)
+		if pake.NeedsASCIIPackageName(displayName) {
+			pkg := pake.ASCIIPackageName(displayName)
+			inputs["name"] = pkg
+			inputs["title"] = displayName
+			o.log("应用名含非 ASCII，云端打包名使用 " + pkg + "（窗口标题保留原文）")
+		}
 		inputs["width"] = itoaDefault(job.Request.Width, 1200)
 		inputs["height"] = itoaDefault(job.Request.Height, 780)
 		inputs["new_window"] = FormatBool(job.Request.NewWindow)
@@ -418,12 +428,7 @@ func extractZipFile(f *zip.File, dest string) error {
 }
 
 func sanitizeFile(name string) string {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return "app"
-	}
-	repl := strings.NewReplacer(`/`, "-", `\`, "-", `:`, "-", `*`, "-", `?`, "-", `"`, "-", `<`, "-", `>`, "-", `|`, "-")
-	return repl.Replace(name)
+	return pake.ASCIIPackageName(name)
 }
 
 // FetchURL is a small helper for future use.

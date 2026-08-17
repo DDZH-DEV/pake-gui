@@ -11,6 +11,7 @@ import (
 	"pake-gui/internal/applog"
 	"pake-gui/internal/cloud/common"
 	"pake-gui/internal/cloud/github"
+	"pake-gui/internal/pake"
 )
 
 func (s *Server) cloudStore() *common.Store {
@@ -258,10 +259,11 @@ func (s *Server) handleCloudJobs(w http.ResponseWriter, r *http.Request) {
 			return *p
 		}
 
+		displayName := strings.TrimSpace(body.Name)
 		req := common.Request{
 			Platform:         platform,
 			URL:              strings.TrimSpace(body.URL),
-			Name:             strings.TrimSpace(body.Name),
+			Name:             displayName,
 			Icon:             strings.TrimSpace(body.Icon),
 			Width:            body.Width,
 			Height:           body.Height,
@@ -284,6 +286,15 @@ func (s *Server) handleCloudJobs(w http.ResponseWriter, r *http.Request) {
 			EnableDownload:   boolOr(body.EnableDownload, true),
 			PushPlaceholder:  body.PushPlaceholder,
 		}
+		var nameNote string
+		// Desktop installers / artifacts need ASCII names; Android launcher label may stay Chinese.
+		if platform == common.PlatformWindows || platform == common.PlatformMacOS {
+			if pake.NeedsASCIIPackageName(req.Name) {
+				pkg := pake.ASCIIPackageName(req.Name)
+				nameNote = "应用名含非 ASCII，云端打包名使用 " + pkg + "（原名：" + displayName + "）"
+				req.Name = pkg
+			}
+		}
 		job, err := store.Create(req)
 		if err != nil {
 			writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
@@ -296,7 +307,13 @@ func (s *Server) handleCloudJobs(w http.ResponseWriter, r *http.Request) {
 		go s.runCloudJob(job.ID, st, outDir)
 
 		applog.Info("cloud job created id=%s platform=%s name=%s", job.ID, platform, req.Name)
-		writeJSON(w, map[string]any{"ok": true, "job": job})
+		resp := map[string]any{"ok": true, "job": job}
+		if nameNote != "" {
+			resp["nameNote"] = nameNote
+			applog.Info("%s", nameNote)
+		}
+		writeJSON(w, resp)
+		return
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}

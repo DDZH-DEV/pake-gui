@@ -191,6 +191,10 @@ func ResolveRunner() (bin string, prefix []string, err error) {
 }
 
 func Run(ctx context.Context, o Options, log LogFn) Result {
+	if note := NormalizePackageIdentity(&o); note != "" && log != nil {
+		log(note)
+	}
+
 	args, err := BuildArgs(o)
 	if err != nil {
 		return Result{OK: false, Message: err.Error()}
@@ -207,7 +211,14 @@ func Run(ctx context.Context, o Options, log LogFn) Result {
 	outDir := strings.TrimSpace(o.OutDir)
 	if outDir == "" {
 		cwd, _ := os.Getwd()
-		outDir = filepath.Join(cwd, "builds")
+		switch runtime.GOOS {
+		case "windows":
+			outDir = filepath.Join(cwd, "builds", "windows")
+		case "darwin":
+			outDir = filepath.Join(cwd, "builds", "macos")
+		default:
+			outDir = filepath.Join(cwd, "builds")
+		}
 	}
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return Result{OK: false, Message: err.Error(), Command: cmdLine}

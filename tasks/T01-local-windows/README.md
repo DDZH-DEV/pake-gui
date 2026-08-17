@@ -20,8 +20,8 @@
 
 ## 建议收尾
 
-- [ ] 产物默认落到 `builds/windows/`  
-- [ ] UI 对 MSI + 非 ASCII 名称给出显式警告  
+- [x] 产物默认落到 `builds/windows/`  
+- [x] UI 对 MSI + 非 ASCII 名称：自动转拼音打包名 + 提示  
 - [ ] 本地 history 标记 `source: local`  
 
 ## 相关路径

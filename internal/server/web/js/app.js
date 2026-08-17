@@ -437,6 +437,10 @@ async function previewCmd() {
       return;
     }
     cmdPreview.textContent = data.command;
+    if (data.name && opts.name && data.name !== opts.name) {
+      cmdPreview.textContent +=
+        "\n# 打包名已规范为: " + data.name + (data.title ? "（窗口标题: " + data.title + "）" : "");
+    }
     if (!outDirInput.value) outDirInput.placeholder = data.outDir;
   } catch (err) {
     cmdPreview.textContent = err.message;
@@ -1212,6 +1216,7 @@ async function submitCloudMacOS() {
     switchTab("cloud");
     return;
   }
+  if (data.nameNote) appendLog(data.nameNote);
   appendLog("已创建任务：" + data.job?.id + "（后台轮询 GitHub Actions，产物在 " + outHint + "）");
   refreshCloudJobs();
   switchTab("cloud");

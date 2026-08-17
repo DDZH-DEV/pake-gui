@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"pake-gui/internal/applog"
@@ -95,6 +96,18 @@ func isLocalOrigin(origin string) bool {
 		strings.HasPrefix(o, "http://[::1]")
 }
 
+// defaultLocalOutDir is the platform folder under builds/ for local packaging.
+func (s *Server) defaultLocalOutDir() string {
+	switch runtime.GOOS {
+	case "windows":
+		return filepath.Join(s.cfg.BuildsDir, "windows")
+	case "darwin":
+		return filepath.Join(s.cfg.BuildsDir, "macos")
+	default:
+		return s.cfg.BuildsDir
+	}
+}
+
 // resolveOutDir confines output to buildsDir unless allowExternal is true.
 func (s *Server) resolveOutDir(requested string, allowExternal bool) (string, error) {
 	base, err := filepath.Abs(s.cfg.BuildsDir)
@@ -103,7 +116,7 @@ func (s *Server) resolveOutDir(requested string, allowExternal bool) (string, er
 	}
 	req := strings.TrimSpace(requested)
 	if req == "" {
-		return base, nil
+		return filepath.Abs(s.defaultLocalOutDir())
 	}
 
 	var abs string
@@ -133,7 +146,7 @@ func (s *Server) resolveOpenPath(requested string) (string, error) {
 	}
 	req := strings.TrimSpace(requested)
 	if req == "" {
-		return base, nil
+		return filepath.Abs(s.defaultLocalOutDir())
 	}
 	var abs string
 	if filepath.IsAbs(req) {

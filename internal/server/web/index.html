@@ -57,7 +57,8 @@
                 </label>
                 <label class="field">
                   <span>应用名称</span>
-                  <input name="name" required placeholder="MyApp" />
+                  <input name="name" required placeholder="MyApp 或 中文名" />
+                  <span class="field-hint">可填中文。本机 / 云端 Win·Mac 会自动转拼音打包名；窗口标题保留原文。Android 图标名可保留中文。</span>
                 </label>
                 <label class="field">
                   <span>版本号</span>
@@ -220,8 +221,8 @@
               <div class="field-grid">
                 <label class="field span-2">
                   <span>输出目录</span>
-                  <input name="outDir" id="out-dir" placeholder="默认 ./builds" />
-                  <span class="field-hint">绝对路径若不在 builds 内，提交时会要求确认。</span>
+                  <input name="outDir" id="out-dir" placeholder="默认 ./builds/windows" />
+                  <span class="field-hint">本机默认落到 builds/windows；绝对路径若不在 builds 内，提交时会要求确认。</span>
                 </label>
                 <label class="field">
                   <span>Targets（本机 Windows）</span>

@@ -2,7 +2,7 @@
 
 ## 目标
 
-本机不必安装 Visual Studio / MSVC。GUI 提交 GitHub Actions（`windows-latest`），只出 **exe**（`--iterative-build`，不打 MSI）。
+本机不必安装 Visual Studio / MSVC。GUI 提交 GitHub Actions（`windows-latest`），只出 **exe**（patch pake WinBuilder → `tauri --no-bundle`；仅靠 `--iterative-build` 在 Windows 上仍会打 MSI）。
 
 ## 验收
 

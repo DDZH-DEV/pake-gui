@@ -27,7 +27,7 @@
 3. 按需展开「窗口与行为」「高级选项」  
 4. 可先点 **预览命令**（确认参数是否写入 CLI）  
 5. 点 **开始本机打包**，右侧看日志  
-6. 产物一般在程序目录下的 `builds/`（也可整理到 `builds/windows/`）
+6. 产物默认在程序目录下的 `builds/windows/`
 
 参数模板示例：`configs/windows/`（可自行添加 JSON）。
 
@@ -55,10 +55,8 @@
 
 ## 名称与 MSI 注意
 
-- 应用名含**中文**时，WiX 打 **MSI** 常失败（`light.exe` / 代码页问题）  
-- 处理办法（任选）：
-  1. 名称改用英文，如 `HunliPai-AI`
-  2. 勾选 **快速迭代构建**（只要 exe）
+- 应用名含**中文**时，本机会自动转成拼音 ASCII 打包名（窗口标题保留原文），避免 WiX 打 **MSI** 失败  
+- 仍可手动使用英文名，如 `HunliPai-AI`；或勾选 **快速迭代构建**（只要 exe）  
 - 编译本身可能已成功：可在 pake 缓存目录找到 `pake-*.exe`
 
 ## 与云端联动
@@ -69,7 +67,8 @@
 2. **提交 Windows 云端（exe）**  
 3. 产物在 `builds/windows/`（只有 exe，不打 MSI）
 
-工作流：`.github/workflows/build-windows.yml`（需已 push）。公开仓库标准 runner 不计费。
+工作流：`.github/workflows/build-windows.yml`（需已 push）。公开仓库标准 runner 不计费。  
+中文应用名会自动用拼音作打包名；workflow 强制只出 exe（不跑 WiX MSI）。
 
 也可在 **任务** Tab 对本机记录点 **回填·云端**，再改目标为 Windows 或 macOS。
 

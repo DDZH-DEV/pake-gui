@@ -136,8 +136,12 @@ def apply_icon(src: str) -> None:
     ):
         d = APP_RES / name
         d.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(dest, d / "ic_launcher.png")
-        shutil.copyfile(dest, d / "ic_launcher_round.png")
+        launcher = d / "ic_launcher.png"
+        round_icon = d / "ic_launcher_round.png"
+        if launcher.resolve() != dest.resolve():
+            shutil.copyfile(dest, launcher)
+        if round_icon.resolve() != dest.resolve():
+            shutil.copyfile(dest, round_icon)
     print(f"installed launcher icon: {dest}")
 
 

@@ -94,6 +94,9 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          # macos-latest is Apple Silicon; Universal (--multi-arch) also needs Intel.
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Cache Cargo
         uses: actions/cache@v4

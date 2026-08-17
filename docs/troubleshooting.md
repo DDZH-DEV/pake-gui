@@ -71,6 +71,14 @@ failed to run ...\light.exe
 
 ---
 
+## 云端：`Target x86_64-apple-darwin is not installed`
+
+勾了 **Universal（Intel+Apple）** 时，pake 会打 `universal-apple-darwin`。GitHub `macos-latest` 默认只有 Apple Silicon 工具链，缺 Intel 目标就会失败。
+
+处理：使用已安装 `x86_64-apple-darwin` 的 workflow（push 后再提交）；或不勾 Universal，只打当前 runner 架构（更快）。  
+
+---
+
 ## macOS：下载的 DMG 打不开 / 已损坏
 
 未签名常见现象。可尝试：

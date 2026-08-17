@@ -435,9 +435,10 @@ input:focus,
 .tool-list li,
 .history li {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.55rem 0;
+  padding: 0.7rem 0;
   border-top: 1px solid var(--line);
   font-size: 0.9rem;
 }
@@ -447,13 +448,26 @@ input:focus,
   border-top: 0;
 }
 
+.hist-body {
+  flex: 1;
+  min-width: 0;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.12rem 0.5rem;
+  justify-content: center;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  padding: 0.2rem 0.55rem;
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  writing-mode: horizontal-tb;
+  height: fit-content;
 }
 
 .badge.ok {
@@ -504,37 +518,55 @@ input:focus,
   word-break: break-all;
 }
 
-.history button {
+.history .hist-name {
   all: unset;
   cursor: pointer;
   color: var(--accent-deep);
   font-weight: 600;
+  display: inline;
+}
+
+.history .hist-name:hover {
+  text-decoration: underline;
 }
 
 .history .meta {
   color: var(--muted);
   font-size: 0.8rem;
+  margin-top: 0.15rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .hist-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.4rem;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
 }
 
 .hist-actions .btn.tiny {
   all: unset;
+  box-sizing: border-box;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  padding: 0.2rem 0.55rem;
+  justify-content: center;
+  min-height: 1.7rem;
+  padding: 0.25rem 0.65rem;
   border-radius: 8px;
   font-size: 0.75rem;
   font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
   background: rgba(11, 110, 99, 0.1);
   color: var(--accent-deep);
-  border: 1px solid rgba(11, 110, 99, 0.2);
+  border: 1px solid rgba(11, 110, 99, 0.22);
 }
 
 .hist-actions .btn.tiny:hover {

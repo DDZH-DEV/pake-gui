@@ -16,7 +16,7 @@
 1. 打开 **云端** Tab  
 2. 确认 Owner / Repo（默认 `DDZH-DEV` / `pake-gui`）  
 3. **使用 GitHub 授权**（或高级选项粘贴 PAT）→ **测试连接**  
-4. 选择产物格式 `dmg` 或 `app`；需要 Intel+Apple 再勾 Universal  
+4. 选择产物格式 `dmg` 或 `app`。Universal（Intel+Apple）更慢，且 CI 需同时安装 `x86_64` 工具链；不勾则只打 Apple Silicon  
 5. 点 **提交 macOS 云端**  
 6. 同页右侧或 **任务** Tab 查看进度  
 7. 成功后产物在 `builds/macos/`

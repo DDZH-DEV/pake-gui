@@ -23,6 +23,18 @@ function resolveToken() {
 
 const TOKEN = resolveToken();
 
+function escapeHtml(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function escapeAttr(s) {
+  return escapeHtml(s).replace(/'/g, "&#39;");
+}
+
 function apiHeaders(extra = {}) {
   const h = { ...extra };
   if (TOKEN) h["X-Pake-Token"] = TOKEN;
@@ -196,7 +208,8 @@ async function refreshEnv() {
     for (const t of data.tools || []) {
       const li = document.createElement("li");
       const left = document.createElement("div");
-      left.innerHTML = `<strong>${t.name}</strong><div class="meta">${t.version || t.detail || ""}</div>`;
+      left.className = "hist-body";
+      left.innerHTML = `<strong>${escapeHtml(t.name)}</strong><div class="meta">${escapeHtml(t.version || t.detail || "")}</div>`;
       const badge = document.createElement("span");
       badge.className = `badge ${t.ok ? "ok" : "bad"}`;
       badge.textContent = t.ok ? "就绪" : "缺失";
@@ -229,10 +242,11 @@ async function refreshHistory() {
     for (const item of items.slice(0, 20)) {
       const li = document.createElement("li");
       const left = document.createElement("div");
+      left.className = "hist-body";
       const ok = item.result?.ok;
       const opts = item.options || {};
-      left.innerHTML = `<button type="button" class="hist-name">${opts.name || "未命名"}</button>
-        <div class="meta">${opts.url || ""}</div>
+      left.innerHTML = `<button type="button" class="hist-name">${escapeHtml(opts.name || "未命名")}</button>
+        <div class="meta">${escapeHtml(opts.url || "")}</div>
         <div class="hist-actions">
           <button type="button" class="btn tiny hist-pack">回填·本机</button>
           <button type="button" class="btn tiny hist-cloud">回填·云端</button>
@@ -864,11 +878,13 @@ async function refreshCloudJobs() {
         if (st === "running" || st === "queued") needPoll = true;
         const li = document.createElement("li");
         const left = document.createElement("div");
+        left.className = "hist-body";
         const req = job.request || {};
         const name = req.name || job.id;
         const plat = req.platform || "macos";
-        left.innerHTML = `<button type="button" class="hist-name">${name}</button>
-          <div class="meta">${plat} · ${job.id}<br/>${job.status?.message || ""}</div>
+        const msg = job.status?.message || "";
+        left.innerHTML = `<button type="button" class="hist-name">${escapeHtml(name)}</button>
+          <div class="meta" title="${escapeAttr(plat + " · " + job.id + (msg ? " — " + msg : ""))}">${escapeHtml(plat)} · ${escapeHtml(job.id)}${msg ? "<br/>" + escapeHtml(msg) : ""}</div>
           <div class="hist-actions">
             <button type="button" class="btn tiny hist-fill">回填</button>
             <button type="button" class="btn tiny hist-open">打开产物</button>
